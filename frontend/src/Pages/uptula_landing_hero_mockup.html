@@ -1,0 +1,310 @@
+
+<style>
+  .hero-wrap {
+    width: 380px;
+    min-height: 780px;
+    background: #0f1a2e;
+    border-radius: 28px;
+    overflow: hidden;
+    position: relative;
+    font-family: var(--font-sans);
+    margin: 0 auto;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 20px 10px;
+  }
+  .logo {
+    font-size: 20px;
+    font-weight: 500;
+    color: #2ecc71;
+    letter-spacing: 0.5px;
+  }
+  .logo span { color: #fff; }
+  .menu-btn {
+    width: 36px; height: 36px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.07);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 5px; cursor: pointer;
+  }
+  .menu-btn span {
+    display: block; width: 18px; height: 2px;
+    background: #fff; border-radius: 2px;
+  }
+  .hero-text-area {
+    padding: 24px 20px 0;
+    position: relative;
+    z-index: 2;
+  }
+  .tag-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(46,204,113,0.15);
+    border: 1px solid rgba(46,204,113,0.3);
+    color: #2ecc71;
+    font-size: 12px;
+    padding: 5px 12px;
+    border-radius: 20px;
+    margin-bottom: 14px;
+  }
+  .tag-dot {
+    width: 6px; height: 6px;
+    background: #2ecc71;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%,100%{opacity:1} 50%{opacity:0.4}
+  }
+  .hero-headline {
+    font-size: 30px;
+    font-weight: 500;
+    color: #fff;
+    line-height: 1.25;
+    margin: 0 0 10px;
+  }
+  .hero-headline .accent { color: #2ecc71; }
+  .hero-sub {
+    font-size: 14px;
+    color: rgba(255,255,255,0.55);
+    line-height: 1.6;
+    margin: 0 0 20px;
+    max-width: 260px;
+  }
+  .stats-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .stat-item {
+    text-align: center;
+  }
+  .stat-num {
+    font-size: 18px;
+    font-weight: 500;
+    color: #fff;
+  }
+  .stat-label {
+    font-size: 11px;
+    color: rgba(255,255,255,0.4);
+    margin-top: 2px;
+  }
+  .stat-div {
+    width: 1px;
+    background: rgba(255,255,255,0.12);
+    align-self: stretch;
+  }
+  .hero-image-wrap {
+    position: relative;
+    height: 320px;
+    margin-top: -10px;
+    overflow: hidden;
+  }
+  .hero-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top center;
+    display: block;
+  }
+  .img-fade {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 120px;
+    background: linear-gradient(to bottom, transparent, #0f1a2e);
+  }
+  .img-fade-top {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 40px;
+    background: linear-gradient(to top, transparent, #0f1a2e);
+  }
+  .floating-badge {
+    position: absolute;
+    background: rgba(255,255,255,0.1);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 12px;
+    padding: 8px 12px;
+    font-size: 12px;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .badge-icon {
+    width: 28px; height: 28px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px;
+  }
+  .badge-left { top: 20px; left: 16px; }
+  .badge-right { top: 50px; right: 12px; }
+  .badge-title { font-size: 12px; color: #fff; font-weight: 500; line-height: 1.2; }
+  .badge-sub { font-size: 11px; color: rgba(255,255,255,0.5); }
+  .bottom-panel {
+    padding: 0 20px 24px;
+    position: relative;
+    z-index: 2;
+  }
+  .search-box {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 14px;
+    padding: 14px 16px;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: rgba(255,255,255,0.4);
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .search-icon {
+    color: rgba(255,255,255,0.35);
+    font-size: 18px;
+  }
+  .cat-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .cat-pill {
+    flex-shrink: 0;
+    padding: 7px 14px;
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,0.12);
+    color: rgba(255,255,255,0.65);
+    font-size: 12px;
+    cursor: pointer;
+    background: transparent;
+    transition: all 0.15s;
+  }
+  .cat-pill.active {
+    background: #2ecc71;
+    border-color: #2ecc71;
+    color: #0f1a2e;
+    font-weight: 500;
+  }
+  .cta-row {
+    display: flex;
+    gap: 10px;
+  }
+  .btn-primary {
+    flex: 1;
+    background: #2ecc71;
+    color: #0f1a2e;
+    border: none;
+    border-radius: 12px;
+    padding: 14px;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: center;
+  }
+  .btn-outline {
+    flex: 1;
+    background: transparent;
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 12px;
+    padding: 14px;
+    font-size: 15px;
+    cursor: pointer;
+    text-align: center;
+  }
+</style>
+
+<div class="hero-wrap">
+  <nav class="nav">
+    <div class="menu-btn">
+      <span></span><span></span><span></span>
+    </div>
+    <div class="logo">UP<span>TULA</span></div>
+    <div style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.07);display:flex;align-items:center;justify-content:center;">
+      <i class="ti ti-user" style="color:rgba(255,255,255,0.6);font-size:18px;" aria-hidden="true"></i>
+    </div>
+  </nav>
+
+  <div class="hero-text-area">
+    <div class="tag-pill">
+      <span class="tag-dot"></span>
+      5 lakh+ active jobs
+    </div>
+    <h1 class="hero-headline">
+      Find your<br><span class="accent">dream career</span><br>match today
+    </h1>
+    <p class="hero-sub">Jobs across every industry — tech, healthcare, construction, business &amp; more.</p>
+
+    <div class="stats-row">
+      <div class="stat-item">
+        <div class="stat-num">50K+</div>
+        <div class="stat-label">Companies</div>
+      </div>
+      <div class="stat-div"></div>
+      <div class="stat-item">
+        <div class="stat-num">5L+</div>
+        <div class="stat-label">Open jobs</div>
+      </div>
+      <div class="stat-div"></div>
+      <div class="stat-item">
+        <div class="stat-num">2M+</div>
+        <div class="stat-label">Job seekers</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="hero-image-wrap">
+    <img class="hero-img" src="/mnt/user-data/uploads/1779085369065_Job___.png" alt="Multi-profession professional" />
+    <div class="img-fade-top"></div>
+    <div class="img-fade"></div>
+
+    <div class="floating-badge badge-left">
+      <div class="badge-icon" style="background:rgba(46,204,113,0.2);">
+        <i class="ti ti-briefcase" style="color:#2ecc71;font-size:15px;" aria-hidden="true"></i>
+      </div>
+      <div>
+        <div class="badge-title">New today</div>
+        <div class="badge-sub">+340 jobs posted</div>
+      </div>
+    </div>
+
+    <div class="floating-badge badge-right">
+      <div class="badge-icon" style="background:rgba(255,193,7,0.2);">
+        <i class="ti ti-check" style="color:#f1c40f;font-size:15px;" aria-hidden="true"></i>
+      </div>
+      <div>
+        <div class="badge-title">Verified employers</div>
+        <div class="badge-sub">100% authentic</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom-panel">
+    <div class="search-box">
+      <i class="ti ti-search search-icon" aria-hidden="true"></i>
+      Search jobs, skills, companies...
+    </div>
+
+    <div class="cat-row">
+      <div class="cat-pill active">All jobs</div>
+      <div class="cat-pill">Tech</div>
+      <div class="cat-pill">Healthcare</div>
+      <div class="cat-pill">Engineering</div>
+      <div class="cat-pill">Finance</div>
+    </div>
+
+    <div class="cta-row">
+      <div class="btn-primary">Browse jobs</div>
+      <div class="btn-outline">Post a job</div>
+    </div>
+  </div>
+</div>

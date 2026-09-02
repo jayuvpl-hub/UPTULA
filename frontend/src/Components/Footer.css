@@ -1,0 +1,304 @@
+/* ================================
+   FOOTER TOAST (login / register messages)
+================================ */
+.footer-toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 9999;
+  max-width: min(360px, calc(100vw - 32px));
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
+}
+
+.footer-toast--error {
+  background: #ffe5e5;
+  color: #ff0000;
+  border: 1px solid #ffb3b3;
+}
+
+.footer-toast--success {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+
+/* ================================
+   FOOTER MAIN WRAPPER
+================================ */
+.nk-footer {
+  background-color: #0f172a;
+  color: #e2e8f0;
+  padding: 56px 0 0;
+  margin-top: 50px;
+  position: relative;
+}
+
+/* dark overlay so the city_bg image stays readable */
+.nk-footer::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.92) 0%, rgba(15, 23, 42, 0.78) 100%);
+  z-index: 0;
+}
+
+.nk-container {
+  width: 90%;
+  max-width: 1300px;
+  margin: auto;
+  position: relative;
+  z-index: 1;
+}
+
+.nk-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 48px;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+}
+
+/* ================================
+   LEFT COLUMN (LOGO + SOCIAL)
+================================ */
+.nk-col-left {
+  flex: 0 0 20%;
+  min-width: 180px;
+}
+
+.nk-logo {
+  width: 160px;
+  margin-bottom: 18px;
+}
+
+.nk-col-left h4 {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 14px;
+  color: #ffffff;
+}
+
+.nk-social {
+  display: flex;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.nk-social a {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: #cbd5e1;
+  font-size: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  transition: all 0.25s ease;
+}
+
+.nk-social a:hover {
+  background: #16a34a;
+  color: #fff;
+  border-color: #16a34a;
+  transform: translateY(-2px);
+}
+
+/* ================================
+   MIDDLE COLUMN LINKS (Naukri-style)
+================================ */
+.nk-col-links {
+  flex: 1 1 56%;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 28px 24px;
+  min-width: 260px;
+}
+
+.nk-link-block {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.nk-link-block h5 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0 0 4px;
+  letter-spacing: 0.3px;
+  position: relative;
+  padding-bottom: 10px;
+}
+
+.nk-link-block h5::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 28px;
+  height: 2px;
+  border-radius: 2px;
+  background: #16a34a;
+}
+
+.nk-link-block ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.nk-link-block a {
+  color: #cbd5e1;
+  font-size: 14px;
+  text-decoration: none;
+  transition: color 0.2s ease, padding-left 0.2s ease;
+  display: inline-block;
+}
+
+.nk-link-block a:hover {
+  color: #4ade80;
+  padding-left: 4px;
+}
+
+/* ================================
+   RIGHT COLUMN (APP BOX)
+================================ */
+.nk-col-app {
+  flex: 0 0 22%;
+  min-width: 240px;
+}
+
+.nk-app-box {
+  background: rgba(255, 255, 255, 0.05);
+  padding: 22px 24px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.nk-app-box h4 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+}
+
+.nk-app-box p,
+.nk-app-box .nk-small {
+  font-size: 13px;
+  color: #94a3b8;
+  margin: 8px 0 18px 0;
+}
+
+.nk-app-buttons {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.nk-store-img {
+  width: 130px;
+  height: auto;
+  cursor: pointer;
+  transition: 0.3s;
+  object-fit: contain;
+}
+.nk-store-img:hover {
+  transform: scale(1.05);
+}
+
+/* ================================
+   BOTTOM / COPYRIGHT
+================================ */
+.nk-footer-bottom {
+  margin-top: 44px;
+  border-top: 1px solid rgba(148, 163, 184, 0.18);
+  padding: 18px 0 22px;
+}
+
+.nk-copyright p {
+  margin: 0;
+  font-size: 13.5px;
+  color: #94a3b8;
+}
+
+/* ================================
+   RESPONSIVE DESIGN
+================================ */
+@media (max-width: 992px) {
+  .nk-row {
+    flex-direction: column;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 32px;
+  }
+
+  .nk-col-left,
+  .nk-col-links,
+  .nk-col-app {
+    width: 100%;
+    flex: 0 0 auto;
+  }
+
+  .nk-col-links {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 28px 24px;
+    margin: 0;
+  }
+
+  .nk-footer-bottom {
+    margin-top: 32px;
+  }
+}
+
+@media (max-width: 600px) {
+  .nk-footer {
+    padding: 36px 0 0;
+    margin-top: 32px;
+  }
+
+  .nk-row {
+    gap: 26px;
+  }
+
+  .nk-col-links {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+
+  .nk-link-block a {
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  .nk-social a {
+    width: 34px;
+    height: 34px;
+    font-size: 16px;
+  }
+
+  .nk-store-img {
+    width: 140px;
+  }
+
+  .nk-footer-bottom {
+    margin-top: 24px;
+    padding: 16px 0 18px;
+  }
+
+  .nk-copyright p {
+    font-size: 13px;
+    line-height: 1.4;
+  }
+}

@@ -1,0 +1,62 @@
+# Allow REST methods. LiteSpeed often treats PUT/DELETE as WebDAV and returns 403
+# before the request reaches Node/Passenger.
+<Limit GET HEAD POST PUT PATCH DELETE OPTIONS>
+  Require all granted
+</Limit>
+<IfModule LiteSpeed>
+  RewriteEngine On
+  RewriteCond %{REQUEST_METHOD} ^(PUT|DELETE|PATCH)$
+  RewriteCond %{REQUEST_URI} ^/api/
+  RewriteRule ^(.*)$ - [E=noabort:1]
+</IfModule>
+
+RewriteEngine On
+# Force HTTPS
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://uptula.com/$1 [R=301,L]
+# Remove www
+RewriteCond %{HTTP_HOST} ^www\.uptula\.com [NC]
+RewriteRule ^(.*)$ https://uptula.com/$1 [R=301,L]
+# Device-aware app link redirect (email CTA) — must be before SPA catch-all
+RewriteRule ^redirect$ /redirect.html [L]
+# React SPA routing — serve index.html for any non-file, non-API, non-uploads path
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_URI} !^/api/
+RewriteCond %{REQUEST_URI} !^/uploads/
+RewriteRule ^ /index.html [L]
+# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION BEGIN
+PassengerAppRoot "/home/bmcjatrn/uptula.com/backend"
+PassengerBaseURI "/"
+PassengerNodejs "/home/bmcjatrn/nodevenv/uptula.com/backend/20/bin/node"
+PassengerAppType node
+PassengerStartupFile src/server.js
+# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION END
+# DO NOT REMOVE OR MODIFY. CLOUDLINUX ENV VARS CONFIGURATION BEGIN
+<IfModule Litespeed>
+</IfModule>
+# DO NOT REMOVE OR MODIFY. CLOUDLINUX ENV VARS CONFIGURATION END
+# # DO NOT REMOVE OR MODIFY. CLOUDLINUX ENV VARS CONFIGURATION BEGIN
+# <IfModule Litespeed>
+# </IfModule>
+# # DO NOT REMOVE OR MODIFY. CLOUDLINUX ENV VARS CONFIGURATION END
+
+# RewriteEngine On
+
+# # Force HTTPS
+# RewriteCond %{HTTPS} off
+# RewriteRule ^(.*)$ https://uptula.com/$1 [R=301,L]
+
+# # Remove www
+# RewriteCond %{HTTP_HOST} ^www\.uptula\.com [NC]
+# RewriteRule ^(.*)$ https://uptula.com/$1 [R=301,L]
+
+# # Device-aware app link redirect (email CTA) — must be before SPA catch-all
+# RewriteRule ^redirect$ /redirect.html [L]
+
+# # React SPA routing — serve index.html for any non-file, non-API, non-uploads path
+# RewriteCond %{REQUEST_FILENAME} !-f
+# RewriteCond %{REQUEST_FILENAME} !-d
+# RewriteCond %{REQUEST_URI} !^/api/
+# RewriteCond %{REQUEST_URI} !^/uploads/
+# RewriteRule ^ /index.html [L]

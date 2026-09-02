@@ -1,0 +1,7 @@
+PassengerAppRoot /home/USERNAME/backend
+PassengerBaseURI /
+PassengerAppType node
+PassengerStartupFile src/server.js
+PassengerEnv production
+PassengerNodejs /opt/cpanel/ea-nodejs20/bin/node
+

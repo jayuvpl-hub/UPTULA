@@ -1,0 +1,207 @@
+/* Hidden on desktop and for logged-in users (controlled via Home.js wrapper class) */
+.guest-mobile-hero {
+  display: none;
+  flex-direction: column;
+  background: linear-gradient(135deg, #1de0c6, #43e97b);
+  padding: 0 0 12px;
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.guest-mobile-hero__inner {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 0 16px;
+  width: 100%;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.guest-mobile-hero__inner--bottom {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding-top: 0;
+}
+
+.guest-mobile-hero__copy {
+  text-align: center;
+  margin-bottom: 0;
+}
+
+.guest-mobile-hero__search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 999px;
+  padding: 10px 16px;
+  margin: 0 0 6px;
+  box-shadow: 0 8px 24px rgba(0, 80, 60, 0.12);
+}
+
+.guest-mobile-hero__title {
+  margin: 10px 0 0;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: #000000;
+}
+
+.guest-mobile-hero__subtitle {
+  margin: 0;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.guest-mobile-hero__search-icon {
+  color: #0d9488;
+  font-size: 17px;
+  flex-shrink: 0;
+}
+
+.guest-mobile-hero__search-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 14px;
+  color: #134e4a;
+  min-width: 0;
+}
+
+.guest-mobile-hero__search-input::placeholder {
+  color: #9ca3af;
+  opacity: 1;
+}
+
+.guest-mobile-hero__visual {
+  flex: 0 1 auto;
+  margin-top: auto;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 100%;
+  margin-bottom: 0;
+  padding: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.guest-mobile-hero__image {
+  width: 100%;
+  max-width: none;
+  max-height: 100%;
+  height: auto;
+  display: block;
+  margin: 0;
+  padding: 0;
+  object-fit: contain;
+  object-position: center bottom;
+}
+
+.guest-mobile-hero__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.guest-mobile-hero__actions-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.guest-mobile-hero__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.guest-mobile-hero__btn:active {
+  transform: scale(0.98);
+}
+
+.guest-mobile-hero__btn--light {
+  background: #ffffff;
+  color: #0f766e;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+
+.guest-mobile-hero__btn--primary {
+  background: #2563eb;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+}
+
+.guest-mobile-hero__btn--primary:hover {
+  background: #1d4ed8;
+}
+
+.guest-mobile-hero__btn--app {
+  width: 100%;
+  background: #ff8c1a;
+  color: #ffffff;
+  box-shadow: 0 6px 18px rgba(255, 140, 26, 0.4);
+}
+
+.guest-mobile-hero__btn--app:hover {
+  background: #f57c00;
+}
+
+@media (max-width: 768px) {
+  .home--guest-mobile-hero .guest-mobile-hero {
+    display: flex;
+    /* 100vh fallback → svh (browser UI visible) → JS visualViewport on real devices */
+    height: 100vh;
+    height: 100svh;
+    height: var(--guest-mobile-hero-height, 100svh);
+    max-height: var(--guest-mobile-hero-height, 100svh);
+    padding-top: calc(var(--guest-mobile-header-offset, 70px) + env(safe-area-inset-top, 0px) + 4px);
+    padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    overflow: hidden;
+  }
+
+  .home--guest-mobile-hero .guest-mobile-hero__inner:first-of-type {
+    position: relative;
+    z-index: 1;
+  }
+
+  .home--guest-mobile-hero .hero-landing-banner--default {
+    display: none !important;
+  }
+}
+
+@media (max-width: 768px) and (max-height: 640px) {
+  .guest-mobile-hero__title {
+    font-size: 19px;
+  }
+
+  .guest-mobile-hero__search {
+    padding: 8px 14px;
+    margin-bottom: 8px;
+  }
+
+  .guest-mobile-hero__btn {
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+
+  .guest-mobile-hero__actions {
+    gap: 8px;
+  }
+}

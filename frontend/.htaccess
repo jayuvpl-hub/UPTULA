@@ -1,0 +1,158 @@
+# Allow REST methods. LiteSpeed often treats PUT/DELETE as WebDAV and returns 403
+# before the request reaches Node/Passenger.
+<Limit GET HEAD POST PUT PATCH DELETE OPTIONS>
+  Require all granted
+</Limit>
+<IfModule LiteSpeed>
+  RewriteEngine On
+  RewriteCond %{REQUEST_METHOD} ^(PUT|DELETE|PATCH)$
+  RewriteCond %{REQUEST_URI} ^/api/
+  RewriteRule ^(.*)$ - [E=noabort:1]
+</IfModule>
+
+RewriteEngine On
+# Force HTTPS
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://uptula.com/$1 [R=301,L]
+# Remove www
+RewriteCond %{HTTP_HOST} ^www\.uptula\.com [NC]
+RewriteRule ^(.*)$ https://uptula.com/$1 [R=301,L]
+# Device-aware app link redirect (email CTA) — must be before SPA catch-all
+RewriteRule ^redirect$ /redirect.html [L]
+# React SPA routing — serve index.html for any non-file, non-API, non-uploads path
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_URI} !^/api/
+RewriteCond %{REQUEST_URI} !^/uploads/
+RewriteRule ^ /index.html [L]
+# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION BEGIN
+PassengerAppRoot "/home/bmcjatrn/uptula.com/backend"
+PassengerBaseURI "/"
+PassengerNodejs "/home/bmcjatrn/nodevenv/uptula.com/backend/20/bin/node"
+PassengerAppType node
+PassengerStartupFile src/server.js
+# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION END
+# DO NOT REMOVE OR MODIFY. CLOUDLINUX ENV VARS CONFIGURATION BEGIN
+<IfModule Litespeed>
+</IfModule>
+# DO NOT REMOVE OR MODIFY. CLOUDLINUX ENV VARS CONFIGURATION END
+# <IfModule mod_rewrite.c>
+#   RewriteEngine On
+#   RewriteBase /
+
+#   # Remove .html extension from URLs
+#   RewriteCond %{REQUEST_FILENAME} !-f
+#   RewriteCond %{REQUEST_FILENAME} !-d
+#   RewriteRule ^(.*)\.html$ $1 [L,R=301]
+
+#   # Rewrite all requests to index.html for React Router
+#   RewriteCond %{REQUEST_FILENAME} !-f
+#   RewriteCond %{REQUEST_FILENAME} !-d
+#   RewriteRule ^ index.html [QSA,L]
+
+#   # Ensure www prefix
+#   RewriteCond %{HTTP_HOST} !^www\. [NC]
+#   RewriteCond %{HTTP_HOST} !=localhost [NC]
+#   RewriteRule ^(.*)$ http://www.%{HTTP_HOST}/$1 [R=301,L]
+
+#   # Force HTTPS
+#   RewriteCond %{HTTPS} !=on
+#   RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+#   RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+# </IfModule>
+
+# <IfModule mod_expires.c>
+#   ExpiresActive On
+
+#   # Images
+#   ExpiresByType image/jpeg "access plus 1 year"
+#   ExpiresByType image/gif "access plus 1 year"
+#   ExpiresByType image/png "access plus 1 year"
+#   ExpiresByType image/webp "access plus 1 year"
+#   ExpiresByType image/svg+xml "access plus 1 year"
+#   ExpiresByType image/x-icon "access plus 1 year"
+
+#   # CSS
+#   ExpiresByType text/css "access plus 1 month"
+
+#   # JavaScript
+#   ExpiresByType application/javascript "access plus 1 month"
+#   ExpiresByType text/javascript "access plus 1 month"
+
+#   # Fonts
+#   ExpiresByType application/font-woff "access plus 1 year"
+#   ExpiresByType application/font-woff2 "access plus 1 year"
+#   ExpiresByType application/x-font-ttf "access plus 1 year"
+#   ExpiresByType application/x-font-opentype "access plus 1 year"
+#   ExpiresByType application/vnd.ms-fontobject "access plus 1 year"
+
+#   # HTML
+#   ExpiresByType text/html "access plus 0 seconds"
+
+#   # Default
+#   ExpiresDefault "access plus 2 days"
+# </IfModule>
+
+# <IfModule mod_deflate.c>
+#   AddOutputFilterByType DEFLATE text/html
+#   AddOutputFilterByType DEFLATE text/plain
+#   AddOutputFilterByType DEFLATE text/xml
+#   AddOutputFilterByType DEFLATE text/css
+#   AddOutputFilterByType DEFLATE text/javascript
+#   AddOutputFilterByType DEFLATE application/javascript
+#   AddOutputFilterByType DEFLATE application/xhtml+xml
+#   AddOutputFilterByType DEFLATE application/xml
+#   AddOutputFilterByType DEFLATE application/rss+xml
+#   AddOutputFilterByType DEFLATE application/atom+xml
+#   AddOutputFilterByType DEFLATE image/svg+xml
+#   AddOutputFilterByType DEFLATE application/x-font-ttf
+#   AddOutputFilterByType DEFLATE application/x-font-opentype
+#   AddOutputFilterByType DEFLATE application/vnd.ms-fontobject
+#   AddOutputFilterByType DEFLATE font/ttf
+#   AddOutputFilterByType DEFLATE font/otf
+# </IfModule>
+
+# <IfModule mod_headers.c>
+#   # Security Headers
+#   Header set X-Content-Type-Options "nosniff"
+#   Header set X-Frame-Options "SAMEORIGIN"
+#   Header set X-XSS-Protection "1; mode=block"
+#   Header set Referrer-Policy "strict-origin-when-cross-origin"
+#   Header set Content-Security-Policy "default-src 'self' https: data: 'unsafe-inline' 'unsafe-eval'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://uptula.com; frame-ancestors 'self';"
+
+#   # Cache Control
+#   <FilesMatch "\.html$">
+#     Header set Cache-Control "public, max-age=0, must-revalidate"
+#   </FilesMatch>
+
+#   <FilesMatch "\.(js|css)$">
+#     Header set Cache-Control "public, max-age=31536000, immutable"
+#   </FilesMatch>
+
+#   <FilesMatch "\.(jpg|jpeg|png|gif|ico|svg|woff|woff2|ttf|eot)$">
+#     Header set Cache-Control "public, max-age=31536000, immutable"
+#   </FilesMatch>
+# </IfModule>
+
+# # Block access to hidden files and directories
+# <FilesMatch "^\.">
+#   <IfModule mod_authz_core.c>
+#     Require all denied
+#   </IfModule>
+#   <IfModule !mod_authz_core.c>
+#     Order allow,deny
+#     Deny from all
+#   </IfModule>
+# </FilesMatch>
+
+# # Disable directory listing
+# Options -Indexes
+
+# # Set default charset
+# AddDefaultCharset UTF-8
+
+# # Enable mod_rewrite for all requests
+# <IfModule mod_rewrite.c>
+#   RewriteCond %{REQUEST_FILENAME} !-f
+#   RewriteCond %{REQUEST_FILENAME} !-d
+# </IfModule>
