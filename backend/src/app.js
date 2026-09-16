@@ -1,5 +1,5 @@
 // Ensure .env is loaded even on hosts that run app.js directly (e.g. cPanel/Passenger)
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
 
 const express = require('express');
 const morgan = require('morgan');

@@ -1,38 +1,53 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
-const multer = require('multer');
+const os = require('os');
+const { GetObjectCommand } = require('@aws-sdk/client-s3');
 const { query } = require('../db');
 const { authenticate } = require('../middleware/auth');
-const { uploadPath } = require('../config/env');
+const { S3_BUCKET, s3KeyFromStoredValue, deleteUploadedFile } = require('../config/env');
+const { makeUploader, filters, s3 } = require('../config/Upload');
 const { parseResumeFile } = require('../utils/resumeParser');
 const puppeteer = require('puppeteer');
 
 const router = express.Router();
 
-// Multer storage for resume parsing uploads (same dir/validation as profile resumes).
-const parseStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const dir = uploadPath('resumes');
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname || '');
-    const base = path.basename(file.originalname || 'resume', ext).replace(/[^a-zA-Z0-9_-]/g, '');
-    cb(null, `${Date.now()}_${req.user.id}_${base}${ext}`);
-  },
+// Resume parsing uploads (was: uploads/resumes, same folder profile.route.js
+// uses for resumes — keep both pointing at 'resumes' so nothing splits).
+const resumeUpload = makeUploader('resumes', {
+  fileFilter: filters.resumeOnly,
+  includeUserId: true,
 });
-const resumeUpload = multer({
-  storage: parseStorage,
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    const allowedExt = new Set(['.pdf', '.doc', '.docx']);
-    const ext = (path.extname(file.originalname || '') || '').toLowerCase();
-    if (allowedExt.has(ext)) return cb(null, true);
-    return cb(new Error('Resume must be a PDF or Word (.doc/.docx) file'), false);
-  },
-});
+
+/** Download an S3 object (or legacy bare filename under resumes/) to a temp file for parsing. */
+async function downloadResumeToTemp(storedValue) {
+  let key = s3KeyFromStoredValue(storedValue);
+  if (!key) {
+    const err = new Error('Invalid resume key');
+    err.status = 404;
+    throw err;
+  }
+  // Legacy profile rows stored only the basename under uploads/resumes/
+  if (!key.includes('/')) key = `resumes/${key}`;
+  if (key.startsWith('uploads/')) key = key.replace(/^uploads\//, '');
+
+  if (!S3_BUCKET) {
+    const err = new Error('S3 is not configured');
+    err.status = 500;
+    throw err;
+  }
+
+  const ext = path.extname(key) || '.bin';
+  const tempPath = path.join(
+    os.tmpdir(),
+    `resume_parse_${Date.now()}_${Math.random().toString(36).slice(2)}${ext}`
+  );
+
+  const out = await s3.send(new GetObjectCommand({ Bucket: S3_BUCKET, Key: key }));
+  const bytes = Buffer.from(await out.Body.transformToByteArray());
+  fs.writeFileSync(tempPath, bytes);
+  return tempPath;
+}
 
 let browserPromise = null;
 async function getBrowser() {
@@ -327,29 +342,32 @@ router.post('/premium/subscribe', authenticate, async (req, res, next) => {
 // Claude API key is configured (utils/aiService). Always returns a heuristic
 // baseline so it works with or without AI.
 router.post('/parse', authenticate, resumeUpload.single('resume'), async (req, res, next) => {
-  let uploadedPath = null;
+  let uploadedKey = null;
+  let tempPath = null;
   try {
     const userId = req.user.id;
-    let filePath = null;
-    let cleanupAfter = false;
 
     if (req.file) {
-      filePath = req.file.path;
-      uploadedPath = req.file.path;
-      cleanupAfter = String(req.body.persist) !== 'true'; // temp parse unless persist requested
+      // req.file.key is the S3 object key (was req.file.path for local disk).
+      uploadedKey = req.file.key;
+      tempPath = await downloadResumeToTemp(uploadedKey);
     } else {
       const rows = await query('SELECT resume FROM user_profiles WHERE user_id = ?', [userId]);
       const stored = rows[0]?.resume;
       if (!stored) {
         return res.status(400).json({ message: 'No resume found. Upload a file or set one on your profile first.' });
       }
-      filePath = uploadPath('resumes', stored);
-      if (!fs.existsSync(filePath)) {
-        return res.status(404).json({ message: 'Stored resume file is missing on the server.' });
+      try {
+        tempPath = await downloadResumeToTemp(stored);
+      } catch (dlErr) {
+        if (dlErr.$metadata?.httpStatusCode === 404 || dlErr.name === 'NoSuchKey') {
+          return res.status(404).json({ message: 'Stored resume file is missing on the server.' });
+        }
+        throw dlErr;
       }
     }
 
-    const result = await parseResumeFile(filePath);
+    const result = await parseResumeFile(tempPath);
     if (!result.ok) {
       return res.status(422).json({ message: result.message });
     }
@@ -379,9 +397,12 @@ router.post('/parse', authenticate, resumeUpload.single('resume'), async (req, r
   } catch (err) {
     return next(err);
   } finally {
-    // Remove temp upload unless caller asked to persist it.
-    if (uploadedPath && String(req.body.persist) !== 'true') {
-      try { if (fs.existsSync(uploadedPath)) fs.unlinkSync(uploadedPath); } catch (_) {}
+    if (tempPath) {
+      try { if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath); } catch (_) {}
+    }
+    // Remove temp upload from S3 unless caller asked to persist it.
+    if (uploadedKey && String(req.body.persist) !== 'true') {
+      try { await deleteUploadedFile(uploadedKey); } catch (_) {}
     }
   }
 });

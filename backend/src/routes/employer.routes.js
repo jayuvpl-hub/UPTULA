@@ -1,22 +1,14 @@
 const express = require('express');
 const { body } = require('express-validator');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
 const { query } = require('../db');
 const { authenticate } = require('../middleware/auth');
 const { smartNotifyForJob } = require('../utils/smartNotifier');
-const { uploadPath, uploadPathFromUrl } = require('../config/env');
+const { deleteUploadedFile } = require('../config/env');
 const { resolveCompanyLogo } = require('../config/constants');
 const { applyUserContactUpdate } = require('../utils/email');
+const { makeUploader, filters } = require('../config/Upload');
 
 const router = express.Router();
-
-const ensureDirExists = (dirPath) => {
-  if (!fs.existsSync(dirPath)) {
-    fs.mkdirSync(dirPath, { recursive: true });
-  }
-};
 
 const ANALYTICS_FEATURE_KEY = 'job_analytics_dashboard';
 const ANALYTICS_TRIAL_LIMIT = 3;
@@ -141,45 +133,18 @@ function formatAccessRecord(record) {
   };
 }
 
-// Simple disk storage for job logos
-const jobsUploadDir = uploadPath('jobs');
-ensureDirExists(jobsUploadDir);
 
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, jobsUploadDir);
-  },
-  filename: function (req, file, cb) {
-    const ext = path.extname(file.originalname || '');
-    const base = path.basename(file.originalname || 'logo', ext).replace(/[^a-zA-Z0-9_-]/g, '');
-    cb(null, `${Date.now()}_${base}${ext}`);
-  }
-});
-const upload = multer({ storage });
 
-const employerLogoDir = uploadPath('companies');
-ensureDirExists(employerLogoDir);
 
-const employerLogoStorage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, employerLogoDir);
-  },
-  filename: function (req, file, cb) {
-    const ext = path.extname(file.originalname || '');
-    const base = path.basename(file.originalname || 'company_logo', ext).replace(/[^a-zA-Z0-9_-]/g, '');
-    cb(null, `${Date.now()}_${req.user?.id || 'employer'}_${base}${ext}`);
-  }
-});
+// Job logo upload (was: uploads/jobs)
+const upload = makeUploader('jobs');
 
-const employerLogoUpload = multer({
-  storage: employerLogoStorage,
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: function (req, file, cb) {
-    if (!file.mimetype.startsWith('image/')) {
-      return cb(new Error('Only image files are allowed for company logos'), false);
-    }
-    cb(null, true);
-  }
+// Company/employer logo upload (was: uploads/companies)
+// includeUserId: true keeps the `${Date.now()}_${req.user.id}_${base}${ext}`
+// filename pattern the old employerLogoStorage used.
+const employerLogoUpload = makeUploader('companies', {
+  fileFilter: filters.imageOnly,
+  includeUserId: true,
 });
 
 // Get employer profile
@@ -304,12 +269,9 @@ async function updateEmployerProfile(req, res, next) {
     let logoUrl = req.body.logoUrl || previousLogoPath || null;
 
     if (req.file) {
-      logoUrl = `/uploads/companies/${req.file.filename}`;
+      logoUrl = req.file.key;
       if (previousLogoPath) {
-        const oldFilePath = uploadPathFromUrl(previousLogoPath);
-        if (fs.existsSync(oldFilePath)) {
-          fs.unlinkSync(oldFilePath);
-        }
+        await deleteUploadedFile(previousLogoPath);
       }
     }
 
@@ -397,10 +359,7 @@ async function updateEmployerProfile(req, res, next) {
       return res.status(409).json({ message: 'Email already registered' });
     }
     if (req.file) {
-      const uploadedPath = path.join(employerLogoDir, req.file.filename);
-      if (fs.existsSync(uploadedPath)) {
-        fs.unlinkSync(uploadedPath);
-      }
+      await deleteUploadedFile(req.file.key);
     }
     return next(err);
   }
@@ -408,217 +367,6 @@ async function updateEmployerProfile(req, res, next) {
 
 router.put('/profile', authenticate, employerProfileUpload, employerProfileUpdateValidators, updateEmployerProfile);
 
-// // Create a new job posting
-// router.post('/jobs', authenticate, upload.single('companyLogo'), [
-//   body('jobTitle').trim().isLength({ min: 1 }).withMessage('Job title is required'),
-//   body('companyName').trim().isLength({ min: 1 }).withMessage('Company name is required'),
-//   body('description').trim().isLength({ min: 10 }).withMessage('Description must be at least 10 characters'),
-//   body('email').optional().isEmail().normalizeEmail().withMessage('Valid email required'),
-//   body('phone').optional().isMobilePhone().withMessage('Valid phone number required'),
-//   body('website').optional().custom((value) => {
-//     if (!value || value.trim() === '') return true;
-//     // Check if it's a valid URL format
-//     try {
-//       new URL(value);
-//       return true;
-//     } catch {
-//       throw new Error('Valid website URL required (must be a proper URL format)');
-//     }
-//   }),
-//   body('noOfVacancy').optional().isInt({ min: 1 }).withMessage('Number of vacancy must be at least 1'),
-//   body('facebook').optional().custom((value) => {
-//     if (!value || value.trim() === '') return true;
-//     try {
-//       new URL(value);
-//       return true;
-//     } catch {
-//       throw new Error('Valid Facebook URL required');
-//     }
-//   }),
-//   body('twitter').optional().custom((value) => {
-//     if (!value || value.trim() === '') return true;
-//     try {
-//       new URL(value);
-//       return true;
-//     } catch {
-//       throw new Error('Valid Twitter URL required');
-//     }
-//   }),
-//   body('linkedin').optional().custom((value) => {
-//     if (!value || value.trim() === '') return true;
-//     try {
-//       new URL(value);
-//       return true;
-//     } catch {
-//       throw new Error('Valid LinkedIn URL required');
-//     }
-//   }),
-//   body('pinterest').optional().custom((value) => {
-//     if (!value || value.trim() === '') return true;
-//     try {
-//       new URL(value);
-//       return true;
-//     } catch {
-//       throw new Error('Valid Pinterest URL required');
-//     }
-//   }),
-//   body('instagram').optional().custom((value) => {
-//     if (!value || value.trim() === '') return true;
-//     try {
-//       new URL(value);
-//       return true;
-//     } catch {
-//       throw new Error('Valid Instagram URL required');
-//     }
-//   }),
-//   body('salary_type').optional().isIn(['fixed', 'negotiable']).withMessage('salary_type must be fixed or negotiable'),
-//   body('salary_min').optional().isInt({ min: 1 }).withMessage('salary_min must be a positive integer'),
-//   body('salary_max').optional().isInt({ min: 1 }).withMessage('salary_max must be a positive integer')
-// ], async (req, res, next) => {
-//   try {
-//     // Debug: Log the incoming request body
-//     console.log('Job creation request body:', req.body);
-    
-//     const { validationResult } = require('express-validator');
-//     const errors = validationResult(req);
-//     if (!errors.isEmpty()) {
-//       console.log('Validation errors:', errors.array());
-//       return res.status(400).json({ errors: errors.array() });
-//     }
-
-//     // Check if user is an employer
-//     if (req.user.role !== 'provider') {
-//       return res.status(403).json({ message: 'Access denied. Only employers can post jobs.' });
-//     }
-
-//     // FIX 6 (Company Profile Gate): employers must create a company profile
-//     // (with a company name) before they can post jobs / appear in listings.
-//     const profileRows = await query(
-//       'SELECT company_name FROM employer_profiles WHERE user_id = ? LIMIT 1',
-//       [req.user.id]
-//     );
-//     const profileCompanyName = profileRows.length ? String(profileRows[0].company_name || '').trim() : '';
-//     if (!profileCompanyName) {
-//       return res.status(403).json({
-//         message: 'You must complete your Company Profile before posting jobs.',
-//         code: 'COMPANY_PROFILE_REQUIRED'
-//       });
-//     }
-
-//     const salaryFields = resolveSalaryForInsert(req.body);
-//     if (salaryFields.error) {
-//       return res.status(400).json({ message: salaryFields.error });
-//     }
-
-//     const employerId = req.user.id;
-//     const {
-//       jobTitle,
-//       companyName,
-//       category,
-//       description,
-//       noOfVacancy,
-//       experience,
-//       companyLogo,
-//       jobType,
-//       qualification,
-//       skills,
-//       email,
-//       phone,
-//       website,
-//       address,
-//       city,
-//       state,
-//       country,
-//       zipCode,
-//       facebook,
-//       google,
-//       twitter,
-//       linkedin,
-//       pinterest,
-//       instagram
-//     } = req.body;
-
-//     // Handle file upload for company logo
-//     let logoUrl = null;
-//     if (req.file) {
-//       logoUrl = `/uploads/jobs/${req.file.filename}`;
-//     }
-
-//     // Insert job into database
-//     const result = await query(`
-//       INSERT INTO jobs (
-//         employer_id, job_title, company_name, category, description,
-//         salary_range, salary_min, salary_max, salary_type,
-//         no_of_vacancy, experience, company_logo, job_type, qualification, skills,
-//         email, phone, website, address, city, state, country, zip_code,
-//         facebook, google, twitter, linkedin, pinterest, instagram, status
-//       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-//     `, [
-//       employerId,
-//       jobTitle,
-//       profileCompanyName, // FIX 6: always the company-profile name (never a person name / typo)
-//       category || null,
-//       description,
-//       salaryFields.salaryRange,
-//       salaryFields.salaryMin,
-//       salaryFields.salaryMax,
-//       salaryFields.salaryType,
-//       noOfVacancy || 1,
-//       experience || null,
-//       logoUrl,
-//       jobType || 'full_time',
-//       qualification || null,
-//       skills || null,
-//       email || null,
-//       phone || null,
-//       website || null,
-//       address || null,
-//       city || null,
-//       state || null,
-//       country || null,
-//       zipCode || null,
-//       facebook || null,
-//       google || null,
-//       twitter || null,
-//       linkedin || null,
-//       pinterest || null,
-//       instagram || null,
-//       'active'
-//     ]);
-
-//     const jobForScoring = {
-//       job_title: jobTitle,
-//       company_name: companyName,
-//       skills: skills || null,
-//       address: address || null,
-//       city: city || null,
-//       state: state || null,
-//       country: country || null,
-//     };
-
-//     smartNotifyForJob({
-//       job: jobForScoring,
-//       jobId: result.insertId,
-//       excludeUserIds: [employerId]
-//     }).catch((err) => {
-//       console.error('[employer.routes] smartNotifyForJob failed:', err.message);
-//     });
-
-//     res.status(201).json({ 
-//       message: 'Job posted successfully',
-//       jobId: result.insertId,
-//       logoUrl
-//     });
-//   } catch (err) {
-//     if (req.file) {
-//       const uploadedPath = path.join(jobsUploadDir, req.file.filename);
-//       if (fs.existsSync(uploadedPath)) {
-//         fs.unlinkSync(uploadedPath);
-//       }
-//     }
-//     return next(err);
-//   }
-// });
 const jobUpdateValidators = [
   body('jobTitle').optional().trim().isLength({ min: 1 }).withMessage('Job title is required'),
   body('description').optional().trim().isLength({ min: 10 }).withMessage('Description must be at least 10 characters'),
@@ -1010,134 +758,6 @@ router.get('/jobs/:id', authenticate, async (req, res, next) => {
     return next(err);
   }
 });
-
-// // Update a job posting
-// router.put('/jobs/:id', authenticate, upload.single('companyLogo'), [
-//   body('jobTitle').optional().trim().isLength({ min: 1 }).withMessage('Job title is required'),
-//   body('description').optional().trim().isLength({ min: 10 }).withMessage('Description must be at least 10 characters'),
-//   body('email').optional().isEmail().normalizeEmail().withMessage('Valid email required'),
-//   body('phone').optional().isMobilePhone().withMessage('Valid phone number required'),
-//   body('website').optional().isURL().withMessage('Valid website URL required'),
-//   body('noOfVacancy').optional().isInt({ min: 1 }).withMessage('Number of vacancy must be at least 1')
-// ], async (req, res, next) => {
-//   try {
-//     const { validationResult } = require('express-validator');
-//     const errors = validationResult(req);
-//     if (!errors.isEmpty()) {
-//       return res.status(400).json({ errors: errors.array() });
-//     }
-
-//     // Check if user is an employer
-//     if (req.user.role !== 'provider') {
-//       return res.status(403).json({ message: 'Access denied. Only employers can update jobs.' });
-//     }
-
-//     const jobId = req.params.id;
-//     const employerId = req.user.id;
-
-//     // Check if job exists and belongs to employer
-//     const existingJob = await query(
-//       'SELECT id, company_logo FROM jobs WHERE id = ? AND employer_id = ?',
-//       [jobId, employerId]
-//     );
-
-//     if (existingJob.length === 0) {
-//       return res.status(404).json({ message: 'Job not found' });
-//     }
-
-//     const {
-//       jobTitle,
-//       companyName,
-//       category,
-//       description,
-//       salaryRange,
-//       noOfVacancy,
-//       experience,
-//       jobType,
-//       qualification,
-//       skills,
-//       email,
-//       phone,
-//       website,
-//       address,
-//       city,
-//       state,
-//       country,
-//       zipCode,
-//       facebook,
-//       google,
-//       twitter,
-//       linkedin,
-//       pinterest,
-//       instagram,
-//       status
-//     } = req.body;
-
-//     // Handle file upload for company logo
-//     let logoUrl = null;
-//     if (req.file) {
-//       logoUrl = `/uploads/jobs/${req.file.filename}`;
-//       const previousLogo = existingJob[0].company_logo;
-//       if (previousLogo) {
-//         const previousPath = uploadPathFromUrl(previousLogo);
-//         if (fs.existsSync(previousPath)) {
-//           fs.unlinkSync(previousPath);
-//         }
-//       }
-//     }
-
-//     // Build update query dynamically
-//     const updateFields = [];
-//     const updateValues = [];
-
-//     if (jobTitle) { updateFields.push('job_title = ?'); updateValues.push(jobTitle); }
-//     if (companyName) { updateFields.push('company_name = ?'); updateValues.push(companyName); }
-//     if (category) { updateFields.push('category = ?'); updateValues.push(category); }
-//     if (description) { updateFields.push('description = ?'); updateValues.push(description); }
-//     if (salaryRange) { updateFields.push('salary_range = ?'); updateValues.push(salaryRange); }
-//     if (noOfVacancy) { updateFields.push('no_of_vacancy = ?'); updateValues.push(noOfVacancy); }
-//     if (experience) { updateFields.push('experience = ?'); updateValues.push(experience); }
-//     if (logoUrl) { updateFields.push('company_logo = ?'); updateValues.push(logoUrl); }
-//     if (jobType) { updateFields.push('job_type = ?'); updateValues.push(jobType); }
-//     if (qualification) { updateFields.push('qualification = ?'); updateValues.push(qualification); }
-//     if (skills) { updateFields.push('skills = ?'); updateValues.push(skills); }
-//     if (email) { updateFields.push('email = ?'); updateValues.push(email); }
-//     if (phone) { updateFields.push('phone = ?'); updateValues.push(phone); }
-//     if (website) { updateFields.push('website = ?'); updateValues.push(website); }
-//     if (address) { updateFields.push('address = ?'); updateValues.push(address); }
-//     if (city) { updateFields.push('city = ?'); updateValues.push(city); }
-//     if (state) { updateFields.push('state = ?'); updateValues.push(state); }
-//     if (country) { updateFields.push('country = ?'); updateValues.push(country); }
-//     if (zipCode) { updateFields.push('zip_code = ?'); updateValues.push(zipCode); }
-//     if (facebook) { updateFields.push('facebook = ?'); updateValues.push(facebook); }
-//     if (google) { updateFields.push('google = ?'); updateValues.push(google); }
-//     if (twitter) { updateFields.push('twitter = ?'); updateValues.push(twitter); }
-//     if (linkedin) { updateFields.push('linkedin = ?'); updateValues.push(linkedin); }
-//     if (pinterest) { updateFields.push('pinterest = ?'); updateValues.push(pinterest); }
-//     if (instagram) { updateFields.push('instagram = ?'); updateValues.push(instagram); }
-//     if (status) { updateFields.push('status = ?'); updateValues.push(status); }
-
-//     if (updateFields.length > 0) {
-//       updateFields.push('updated_at = CURRENT_TIMESTAMP');
-//       updateValues.push(jobId);
-
-//       await query(
-//         `UPDATE jobs SET ${updateFields.join(', ')} WHERE id = ?`,
-//         updateValues
-//       );
-//     }
-
-//     res.json({ message: 'Job updated successfully' });
-//   } catch (err) {
-//     if (req.file) {
-//       const uploadedPath = path.join(jobsUploadDir, req.file.filename);
-//       if (fs.existsSync(uploadedPath)) {
-//         fs.unlinkSync(uploadedPath);
-//       }
-//     }
-//     return next(err);
-//   }
-// });
 
 // Delete a job posting
 async function deleteEmployerJob(req, res, next) {

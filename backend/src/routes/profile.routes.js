@@ -1,14 +1,15 @@
 const express = require('express');
 const { body } = require('express-validator');
 const multer = require('multer');
+const multerS3 = require('multer-s3');
 const path = require('path');
-const fs = require('fs');
+const { S3Client } = require('@aws-sdk/client-s3');
 const { query, getPool } = require('../db');
 const { authenticate } = require('../middleware/auth');
 const admin = require('../config/firebase');
 const sendEmail = require('../utils/sendEmail');
 const newJobPostedEmailTemplate = require('../utils/newJobPostedEmailTemplate');
-const { CLIENT_ORIGIN, uploadPath } = require('../config/env');
+const { CLIENT_ORIGIN, deleteUploadedFile, S3_BUCKET, AWS_REGION } = require('../config/env');
 const { validateCategoryList } = require('../utils/categoryValidation');
 const { setUserCategories, getUserCategories } = require('../utils/userCategories');
 const { applyUserContactUpdate } = require('../utils/email');
@@ -95,7 +96,7 @@ function buildCandidateProfileResponse(user, profile = {}, selectedCategories = 
     google: profile.google || '',
     preferredJobRole: profile.preferred_job_role || '',
     bio: profile.bio || '',
-    resume: profile.resume ? `/uploads/resumes/${profile.resume}` : '',
+    resume: profile.resume || '',
     resumeName: profile.resume_name || '',
     resumeSize: profile.resume_size || null,
     resumeUploadedAt: profile.resume_uploaded_at || null,
@@ -108,7 +109,7 @@ function buildCandidateProfileResponse(user, profile = {}, selectedCategories = 
     noticePeriod: profile.notice_period || '',
     preferredLocation: profile.preferred_location || '',
     employmentType: profile.employment_type || '',
-    profilePicture: profile.profile_picture ? `/uploads/profiles/${profile.profile_picture}` : '',
+    profilePicture: profile.profile_picture || '',
     preferredLanguage: user.preferred_language || 'en',
     profileCompletion: typeof user.profile_completion === 'number' ? user.profile_completion : 0,
     resumeStatus: user.resume_status || 'none',
@@ -344,31 +345,32 @@ async function sendJobPostedEmailsToSeekers({
   }
 }
 
-// Configure multer for profile picture + resume uploads
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    const isResume = file.fieldname === 'resume';
-    const destDir = uploadPath(isResume ? 'resumes' : 'profiles');
+const s3 = new S3Client({ region: AWS_REGION });
 
-    // Ensure directory exists
-    if (!fs.existsSync(destDir)) {
-      fs.mkdirSync(destDir, { recursive: true });
-    }
-    cb(null, destDir);
-  },
-  filename: function (req, file, cb) {
-    const ext = path.extname(file.originalname || '');
-    const base = path
-      .basename(file.originalname || (file.fieldname === 'resume' ? 'resume' : 'profile'), ext)
-      .replace(/[^a-zA-Z0-9_-]/g, '');
-    cb(null, `${Date.now()}_${req.user.id}_${base}${ext}`);
-  }
-});
+// This uploader has two logical destinations (resumes/ vs profiles/) picked
+// by file.fieldname, so it can't use the shared makeUploader() as-is —
+// makeUploader() takes one fixed folder. Keeping it inline here, same as
+// the original file did.
+if (!S3_BUCKET) {
+  throw new Error('S3_BUCKET is not set. Add it to backend/.env');
+}
 
 const upload = multer({
-  storage,
+  storage: multerS3({
+    s3,
+    bucket: S3_BUCKET,
+    key: (req, file, cb) => {
+      const isResume = file.fieldname === 'resume';
+      const folder = isResume ? 'resumes' : 'profiles';
+      const ext = path.extname(file.originalname || '');
+      const base = path
+        .basename(file.originalname || (isResume ? 'resume' : 'profile'), ext)
+        .replace(/[^a-zA-Z0-9_-]/g, '');
+      cb(null, `${folder}/${Date.now()}_${req.user.id}_${base}${ext}`);
+    },
+  }),
   limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB limit
+    fileSize: 5 * 1024 * 1024, // 5MB limit
   },
   fileFilter: function (req, file, cb) {
     const isProfilePicture = file.fieldname === 'profilePicture';
@@ -383,7 +385,7 @@ const upload = multer({
       const allowedMimes = new Set([
         'application/pdf',
         'application/msword', // .doc
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document' // .docx
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
       ]);
       const allowedExtensions = new Set(['.pdf', '.doc', '.docx']);
       const ext = (path.extname(file.originalname || '') || '').toLowerCase();
@@ -393,7 +395,7 @@ const upload = multer({
     }
 
     return cb(new Error('Invalid upload field'), false);
-  }
+  },
 });
 
 // Get user profile
@@ -685,22 +687,18 @@ async function updateCandidateProfile(req, res, next) {
       const certificationsJson = certifications ? JSON.stringify(certifications) : null;
 
       // Handle profile picture + resume uploads
-      let profilePictureFilename = null;
-      let resumeFilename = null;
+      let profilePictureKey = null;
+      let resumeKey = null;
 
       const profilePictureFile = req.files?.profilePicture?.[0] || null;
       const resumeFile = req.files?.resume?.[0] || null;
 
       if (profilePictureFile) {
-        console.log('Profile picture uploaded:', profilePictureFile);
-        profilePictureFilename = profilePictureFile.filename;
-        console.log('Profile picture filename:', profilePictureFilename);
-      } else {
-        console.log('No profile picture file in request');
+        profilePictureKey = profilePictureFile.key;
       }
 
       if (resumeFile) {
-        resumeFilename = resumeFile.filename;
+        resumeKey = resumeFile.key;
       }
 
       // Check if profile exists
@@ -711,19 +709,13 @@ async function updateCandidateProfile(req, res, next) {
 
       if (existingProfile.length > 0) {
         // Delete old profile picture if new one is uploaded
-        if (profilePictureFilename && existingProfile[0].profile_picture) {
-          const oldFilePath = uploadPath('profiles', existingProfile[0].profile_picture);
-          if (fs.existsSync(oldFilePath)) {
-            fs.unlinkSync(oldFilePath);
-          }
+        if (profilePictureKey && existingProfile[0].profile_picture) {
+          await deleteUploadedFile(existingProfile[0].profile_picture);
         }
 
         // Delete old resume if new one is uploaded
-        if (resumeFilename && existingProfile[0].resume) {
-          const oldResumePath = uploadPath('resumes', existingProfile[0].resume);
-          if (fs.existsSync(oldResumePath)) {
-            fs.unlinkSync(oldResumePath);
-          }
+        if (resumeKey && existingProfile[0].resume) {
+          await deleteUploadedFile(existingProfile[0].resume);
         }
 
         // Update existing candidate profile
@@ -765,7 +757,7 @@ async function updateCandidateProfile(req, res, next) {
           google || null,
           preferredJobRole || null,
           bio || null,
-          resumeFilename || existingProfile[0].resume || null,
+          resumeKey || existingProfile[0].resume || null,
           skillsJson,
           experienceJson,
           educationJson,
@@ -775,7 +767,7 @@ async function updateCandidateProfile(req, res, next) {
           noticePeriod || null,
           preferredLocation || null,
           employmentType || null,
-          profilePictureFilename || existingProfile[0].profile_picture,
+          profilePictureKey || existingProfile[0].profile_picture,
           userId
         ]);
       } else {
@@ -801,7 +793,7 @@ async function updateCandidateProfile(req, res, next) {
           google || null,
           preferredJobRole || null,
           bio || null,
-          resumeFilename || null,
+          resumeKey || null,
           skillsJson,
           experienceJson,
           educationJson,
@@ -811,7 +803,7 @@ async function updateCandidateProfile(req, res, next) {
           noticePeriod || null,
           preferredLocation || null,
           employmentType || null,
-          profilePictureFilename || null
+          profilePictureKey || null
         ]);
       }
 
@@ -837,7 +829,7 @@ async function updateCandidateProfile(req, res, next) {
           );
           await query(
             `UPDATE users SET resume_url = ?, resume_status = 'uploaded' WHERE id = ?`,
-            [resumeFilename ? `/uploads/resumes/${resumeFilename}` : null, userId]
+            [resumeKey || null, userId]
           );
         } catch (metaErr) {
           console.warn('Resume metadata update skipped:', metaErr.message);
@@ -852,7 +844,7 @@ async function updateCandidateProfile(req, res, next) {
         }
       }
 
-      const finalProfilePicture = profilePictureFilename
+      const finalProfilePicture = profilePictureKey
         || (existingProfile.length > 0 ? existingProfile[0].profile_picture : null);
 
       // Recompute profile completion now that profile fields changed.
@@ -873,7 +865,7 @@ async function updateCandidateProfile(req, res, next) {
       const responseData = {
         message: 'Profile updated successfully',
         profileCompletion,
-        profilePicture: finalProfilePicture ? `/uploads/profiles/${finalProfilePicture}` : null,
+        profilePicture: finalProfilePicture || null,
         profile: buildCandidateProfileResponse(
           freshUser,
           freshProfile || {},
@@ -899,12 +891,10 @@ async function updateCandidateProfile(req, res, next) {
       const resumeFile = req.files?.resume?.[0] || null;
 
       if (profilePictureFile) {
-        const filePath = uploadPath('profiles', profilePictureFile.filename);
-        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+        await deleteUploadedFile(profilePictureFile.key);
       }
       if (resumeFile) {
-        const filePath = uploadPath('resumes', resumeFile.filename);
-        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+        await deleteUploadedFile(resumeFile.key);
       }
       return next(err);
     }

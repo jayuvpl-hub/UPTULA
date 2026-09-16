@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
 const app = require('./app');
 const { PORT, PUBLIC_API_URL, NODE_ENV } = require('./config/env');
 const { ensureDatabase } = require('./db/init');

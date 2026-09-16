@@ -1,3 +1,1719 @@
+// import React, { useState, useEffect, useRef } from "react";
+// import { Link, useNavigate } from "react-router-dom";
+// import { useAuth } from "../context/AuthContext";
+// import { FaChevronRight, FaRupeeSign } from "react-icons/fa";
+// import { LuBriefcase, LuBuilding2, LuUsers, LuUser, LuSearch, LuZap } from "react-icons/lu";
+// import Header from "../Components/Header";
+// import Footer from "../Components/Footer";
+// import Chatbot from "../Components/Chatbot";
+// import MobileAppDownload from "../Components/MobileAppDownload";
+// import GuestMobileHero from "../Components/GuestMobileHero";
+// import WishlistButton from "../Components/WishlistButton";
+// import { API_BASE_URL } from "../config/api";
+// import { createSlug } from "../utils/slug";
+// import { trackSearch } from "../utils/trackActivity";
+// import useJobCategories from "../hooks/useJobCategories";
+// import { getCategoryIcon, formatCategoryName } from "../utils/categoryIcons";
+// import { motion, useInView, animate } from "framer-motion";
+// import PageSEO from "../Components/PageSEO";
+
+// // Animated count-up that runs once when scrolled into view (attract-the-eye stat).
+// function CountUp({ to = 0, duration = 2, suffix = "", prefix = "" }) {
+//     const ref = useRef(null);
+//     const inView = useInView(ref, { once: true, margin: "-60px" });
+//     const [val, setVal] = useState(0);
+//     useEffect(() => {
+//         if (!inView) return undefined;
+//         const controls = animate(0, to, {
+//             duration,
+//             ease: "easeOut",
+//             onUpdate: (v) => setVal(Math.floor(v)),
+//         });
+//         return () => controls.stop();
+//     }, [inView, to, duration]);
+//     return (
+//         <span ref={ref}>
+//             {prefix}{val.toLocaleString()}{suffix}
+//         </span>
+//     );
+// }
+
+// function Home() {
+//     const [latestJobs, setLatestJobs] = useState([]);
+//     const [featuredJobs, setFeaturedJobs] = useState([]);
+//     const [appliedJobIds, setAppliedJobIds] = useState(new Set());
+//     const [categories, setCategories] = useState([]);
+//     const [allCategories, setAllCategories] = useState([]);
+//     const [sponsorships, setSponsorships] = useState([]);
+//     const [loading, setLoading] = useState(true);
+//     const [showAllCategories, setShowAllCategories] = useState(false);
+//     const [searchCategory, setSearchCategory] = useState('');
+//     const [searchKeyword, setSearchKeyword] = useState('');
+//     const [searchCategoryId, setSearchCategoryId] = useState('');
+//     const [searchSubCategory, setSearchSubCategory] = useState('');
+//     const [searchLocation, setSearchLocation] = useState('');
+
+//     const HERO_LOCATIONS = ['Hyderabad', 'Bhubaneswar', 'Bangalore', 'Mumbai', 'Kolkata'];
+//     const DEFAULT_NEARBY_CITY = 'Bhubaneswar';
+//     const scrollContainerRef = useRef(null);
+//     const animationFrameRef = useRef(null);
+//     const scrollPositionRef = useRef(0);
+//     const isScrollingPausedRef = useRef(false);
+//     const [companies, setCompanies] = useState([]);
+//     const companiesScrollContainerRef = useRef(null);
+//     const storiesScrollRef = useRef(null);
+//     const [cities, setCities] = useState([]);
+//     const [detectedCity, setDetectedCity] = useState(() => {
+//         try {
+//             return localStorage.getItem('detectedCity') || DEFAULT_NEARBY_CITY;
+//         } catch (_) {
+//             return DEFAULT_NEARBY_CITY;
+//         }
+//     });
+//     const [nearbyJobs, setNearbyJobs] = useState([]);
+
+//     const navigate = useNavigate();
+//     const { user, loading: authLoading } = useAuth();
+//     const showGuestMobileHero = !authLoading && !user;
+//     const {
+//         categories: filterJobCategories,
+//         subcategories: filterSubcategories,
+//         loading: filterCategoriesLoading,
+//         subcategoriesLoading: filterSubcategoriesLoading,
+//         findCategory: findFilterCategory,
+//     } = useJobCategories(searchCategoryId);
+
+//     const submitHeroSearch = () => {
+//         const params = new URLSearchParams();
+//         const q = searchKeyword.trim();
+
+//         if (q) {
+//             params.set("q", q);
+//             trackSearch(q);
+//         }
+//         const selectedCat = findFilterCategory(searchCategoryId);
+//         if (selectedCat?.name) {
+//             params.set("category", selectedCat.name);
+//             trackSearch(selectedCat.name);
+//         }
+//         if (searchSubCategory) {
+//             params.set("subcategory", searchSubCategory);
+//             if (!q) {
+//                 params.set("q", searchSubCategory);
+//                 trackSearch(searchSubCategory);
+//             }
+//         }
+//         if (searchLocation) params.set("city", searchLocation);
+
+//         navigate(`/jobs?${params.toString()}`);
+//     };
+
+//     useEffect(() => {
+//         fetchLatestJobs();
+//         fetchCategories();
+//         fetchSponsorships();
+//         fetchCompanies();
+//         fetchCities();
+//     }, []);
+
+//     // Auto-detect the visitor's city (IP-based, no permission prompt) and load
+//     // jobs in that city to power the "Jobs near you" suggestion section.
+//     useEffect(() => {
+//         let cancelled = false;
+
+//         const loadNearbyJobs = async (city) => {
+//             try {
+//                 const resp = await fetch(`${API_BASE_URL}/api/jobs?city=${encodeURIComponent(city)}&limit=8&page=1`);
+//                 if (!resp.ok) return;
+//                 const data = await resp.json();
+//                 const list = Array.isArray(data.jobs) ? data.jobs : [];
+//                 if (!cancelled) setNearbyJobs(list);
+//             } catch (_) { /* silent */ }
+//         };
+
+//         const detect = async () => {
+//             const cached = (() => {
+//                 try { return localStorage.getItem('detectedCity') || ''; } catch (_) { return ''; }
+//             })();
+//             if (cached) {
+//                 if (!cancelled) setDetectedCity(cached);
+//                 loadNearbyJobs(cached);
+//                 return;
+//             }
+
+//             // Default city until IP geolocation resolves (or if it fails).
+//             if (!cancelled) setDetectedCity(DEFAULT_NEARBY_CITY);
+//             loadNearbyJobs(DEFAULT_NEARBY_CITY);
+
+//             try {
+//                 const res = await fetch('https://ipwho.is/');
+//                 const geo = await res.json();
+//                 const city = geo && geo.success !== false ? (geo.city || geo.region || '') : '';
+//                 if (city) {
+//                     try { localStorage.setItem('detectedCity', city); } catch (_) { }
+//                     if (!cancelled) setDetectedCity(city);
+//                     loadNearbyJobs(city);
+//                 }
+//             } catch (_) { /* keep default city + its jobs */ }
+//         };
+
+//         detect();
+//         return () => { cancelled = true; };
+//     }, []);
+
+//     // Prefill the hero location field with the detected city (without clobbering
+//     // anything the user has already typed/selected).
+//     useEffect(() => {
+//         if (detectedCity) setSearchLocation((prev) => prev || detectedCity);
+//     }, [detectedCity]);
+
+//     useEffect(() => {
+//         const fetchAppliedJobs = async () => {
+//             try {
+//                 if (!user || user.role !== "seeker") {
+//                     setAppliedJobIds(new Set());
+//                     return;
+//                 }
+
+//                 const token = localStorage.getItem("token");
+//                 if (!token) {
+//                     setAppliedJobIds(new Set());
+//                     return;
+//                 }
+
+//                 const response = await fetch(`${API_BASE_URL}/api/applications/mine`, {
+//                     headers: {
+//                         Authorization: `Bearer ${token}`,
+//                         Accept: "application/json",
+//                     },
+//                 });
+
+//                 if (!response.ok) return;
+
+//                 const data = await response.json();
+//                 const ids = (Array.isArray(data.applications) ? data.applications : [])
+//                     .map((application) => String(application.jobId))
+//                     .filter(Boolean);
+//                 setAppliedJobIds(new Set(ids));
+//             } catch (error) {
+//                 console.error("Error fetching applied jobs:", error);
+//             }
+//         };
+
+//         fetchAppliedJobs();
+//     }, [user]);
+
+//     const fetchLatestJobs = async () => {
+//         try {
+//             setLoading(true);
+//             const response = await fetch(`${API_BASE_URL}/api/jobs/latest?limit=12`);
+//             if (response.ok) {
+//                 const data = await response.json();
+//                 const normalized = (data.jobs || []).map(job => {
+//                     const logoPath = job.logo;
+
+//                     // Resolve logo URL - works for both local and server environments
+//                     let logo;
+//                     if (logoPath && (logoPath.startsWith('http://') || logoPath.startsWith('https://') || logoPath.startsWith('data:'))) {
+//                         // Already a full URL or data URI, use as-is
+//                         logo = logoPath;
+//                     } else if (logoPath) {
+//                         // Relative path - construct full URL using API_BASE_URL
+//                         // Ensure API_BASE_URL doesn't have trailing slash
+//                         const baseUrl = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
+//                         // Ensure path starts with /
+//                         const cleanPath = logoPath.startsWith('/') ? logoPath : `/${logoPath}`;
+//                         logo = `${baseUrl}${cleanPath}`;
+//                     } else {
+//                         logo = '';
+//                     }
+
+
+//                     return {
+//                         ...job,
+//                         logo: logo,
+//                         title: job.title || job.jobTitle,
+//                         company: job.company || job.companyName,
+//                         type: job.type || job.jobType,
+//                         location: job.location || `${job.city || ''}${job.city && job.state ? ', ' : ''}${job.state || ''}${(job.city || job.state) && job.country ? ', ' : ''}${job.country || ''}`.trim() || 'Location not specified',
+//                         postedAt: job.postedAt || job.createdAt
+//                     };
+//                 });
+//                 setLatestJobs(normalized.slice(0, 6));
+//                 setFeaturedJobs(normalized.slice(6, 12));
+//             }
+//         } catch (error) {
+//             console.error('Error fetching latest jobs:', error);
+//         } finally {
+//             setLoading(false);
+//         }
+//     };
+
+//     const fetchCategories = async () => {
+//         try {
+//             const response = await fetch(`${API_BASE_URL}/api/jobs/categories`);
+//             if (response.ok) {
+//                 const data = await response.json();
+//                 setCategories(data.categories || []);
+//                 setAllCategories(data.allCategories || []);
+//             }
+//         } catch (error) {
+//             console.error('Error fetching categories:', error);
+//         }
+//     };
+
+//     // Auto-scroll categories only when there are more than 4 cards.
+//     useEffect(() => {
+//         const container = scrollContainerRef.current;
+//         const list = showAllCategories ? allCategories : categories;
+//         const shouldScroll = list.length > 4;
+
+//         if (!container || !shouldScroll) {
+//             if (container) {
+//                 container.scrollLeft = 0;
+//                 scrollPositionRef.current = 0;
+//             }
+//             return;
+//         }
+
+//         scrollPositionRef.current = 0;
+//         container.scrollLeft = 0;
+//         const scrollSpeed = 0.8;
+
+//         const animate = () => {
+//             if (!isScrollingPausedRef.current && container) {
+//                 const oneSetWidth = container.scrollWidth / 2;
+//                 if (oneSetWidth > 0) {
+//                     scrollPositionRef.current += scrollSpeed;
+//                     if (scrollPositionRef.current >= oneSetWidth) {
+//                         scrollPositionRef.current -= oneSetWidth;
+//                     }
+//                     container.scrollLeft = scrollPositionRef.current;
+//                 }
+//             }
+//             animationFrameRef.current = requestAnimationFrame(animate);
+//         };
+
+//         animationFrameRef.current = requestAnimationFrame(animate);
+//         return () => {
+//             if (animationFrameRef.current) {
+//                 cancelAnimationFrame(animationFrameRef.current);
+//             }
+//         };
+//     }, [categories, allCategories, showAllCategories]);
+
+//     const fetchSponsorships = async () => {
+//         try {
+//             const response = await fetch(`${API_BASE_URL}/api/sponsorships`);
+//             if (response.ok) {
+//                 const data = await response.json();
+//                 setSponsorships(data.sponsorships || []);
+//             }
+//         } catch (error) {
+//             console.error('Error fetching sponsorships:', error);
+//         }
+//     };
+
+//     const fetchCompanies = async () => {
+//         try {
+//             // Use companies endpoint for "Dream Company" section
+//             const response = await fetch(`${API_BASE_URL}/api/companies`);
+//             if (response.ok) {
+//                 const data = await response.json();
+//                 const companiesList = Array.isArray(data.companies) ? data.companies : [];
+
+//                 // Try to fetch jobs so we can count jobs per company
+//                 let jobs = [];
+//                 try {
+//                     const jobsResponse = await fetch(`${API_BASE_URL}/api/jobs?limit=1000&page=1`);
+//                     if (jobsResponse.ok) {
+//                         const jobsData = await jobsResponse.json();
+//                         jobs = Array.isArray(jobsData.jobs) ? jobsData.jobs : Array.isArray(jobsData) ? jobsData : [];
+//                     }
+//                 } catch (err) {
+//                     console.error('Error fetching jobs for company counts:', err);
+//                 }
+
+//                 // Keep UI shape the same as before: { name, logo, jobCount, locations[] }
+//                 const isDefaultLogo = (url) => {
+//                     const s = String(url || '').trim().toLowerCase();
+//                     return !s || s.includes('company_logo_1.png');
+//                 };
+
+//                 const normalized = companiesList.map((c) => {
+//                     const address = String(c.address || '').trim();
+//                     const locations = address
+//                         ? address.split(',').map(part => part.trim()).filter(Boolean)
+//                         : [];
+//                     // FIX 6: use the company name only — never the employer's personal name.
+//                     const companyName = String(c.companyName || '').trim();
+//                     const normalizedCompanyName = companyName.toLowerCase();
+
+//                     const jobCount = jobs.reduce((count, job) => {
+//                         const title = String(job.companyName || job.company_name || job.company || '').trim().toLowerCase();
+//                         return title === normalizedCompanyName ? count + 1 : count;
+//                     }, 0);
+
+//                     const hasRealLogo = !isDefaultLogo(c.logoUrl);
+//                     // A real company profile shows at least one of these signals. This
+//                     // guards the section even against a backend that still returns
+//                     // person-name fallbacks (i.e. before the FIX 6 backend redeploy).
+//                     const hasProfileSignal = !!(
+//                         String(c.industry || '').trim() ||
+//                         hasRealLogo ||
+//                         String(c.website || '').trim() ||
+//                         String(c.companySize || '').trim() ||
+//                         String(c.foundedYear || '').trim() ||
+//                         address
+//                     );
+
+//                     // Same fields as Employer Profile completion tracker.
+//                     const hasSocial = !!(
+//                         String(c.linkedin || '').trim() ||
+//                         String(c.twitter || '').trim() ||
+//                         String(c.facebook || '').trim() ||
+//                         String(c.google || '').trim()
+//                     );
+//                     const isProfileComplete = [
+//                         hasRealLogo,
+//                         !!companyName,
+//                         !!String(c.contactPerson || '').trim(),
+//                         !!String(c.email || '').trim(),
+//                         !!String(c.phone || '').trim(),
+//                         !!address,
+//                         !!String(c.website || '').trim(),
+//                         !!String(c.industry || '').trim(),
+//                         !!String(c.companySize || '').trim(),
+//                         !!String(c.companyType || '').trim(),
+//                         !!String(c.foundedYear || '').trim(),
+//                         !!String(c.description || '').trim(),
+//                         hasSocial
+//                     ].every(Boolean);
+
+//                     return {
+//                         id: c.id,
+//                         name: companyName,
+//                         logo: hasRealLogo ? String(c.logoUrl).trim() : "/assets/img/company_logo_1.png",
+//                         jobCount,
+//                         locations,
+//                         isVerified: Boolean(c.isVerified ?? c.is_verified ?? c.verified),
+//                         hasProfileSignal,
+//                         isProfileComplete
+//                     };
+//                 }).filter(c => c.name && c.id != null && (c.isProfileComplete || c.isVerified));
+
+//                 setCompanies(normalized.slice(0, 20));
+//             }
+//         } catch (error) {
+//             console.error('Error fetching companies:', error);
+//         }
+//     };
+
+//     const fetchCities = async () => {
+//         try {
+//             // Always show these 5 cities
+//             const predefinedCities = [
+//                 { name: 'Hyderabad', image: '/assets/img/hyderabad.png' },
+//                 { name: 'Bhubaneswar', image: '/assets/img/bhubaneswar.png' },
+//                 { name: 'Bangalore', image: '/assets/img/bangalore.png' },
+//                 { name: 'Mumbai', image: '/assets/img/mumbai.png' },
+//                 { name: 'Kolkata', image: '/assets/img/kolkata.png' }
+//             ];
+
+//             // Fetch jobs to count jobs per city
+//             const response = await fetch(`${API_BASE_URL}/api/jobs?limit=1000&page=1`);
+//             if (response.ok) {
+//                 const data = await response.json();
+//                 const jobs = data.jobs || [];
+
+//                 // Count jobs for each predefined city
+//                 const citiesWithCounts = predefinedCities.map(city => {
+//                     const jobCount = jobs.filter(job => {
+//                         const jobCity = (job.city || '').toLowerCase();
+//                         return jobCity === city.name.toLowerCase();
+//                     }).length;
+
+//                     return {
+//                         name: city.name,
+//                         image: city.image,
+//                         jobCount: jobCount
+//                     };
+//                 });
+
+//                 setCities(citiesWithCounts);
+//             } else {
+//                 // If API fails, still show cities with 0 jobs
+//                 setCities(predefinedCities.map(city => ({
+//                     name: city.name,
+//                     image: city.image,
+//                     jobCount: 0
+//                 })));
+//             }
+//         } catch (error) {
+//             console.error('Error fetching cities:', error);
+//             // On error, still show cities with 0 jobs
+//             const predefinedCities = [
+//                 { name: 'Hyderabad', image: '/assets/img/hyderabad.png' },
+//                 { name: 'Bhubaneswar', image: '/assets/img/bhubaneswar.png' },
+//                 { name: 'Bangalore', image: '/assets/img/bangalore.png' },
+//                 { name: 'Mumbai', image: '/assets/img/mumbai.png' },
+//                 { name: 'Kolkata', image: '/assets/img/kolkata.png' }
+//             ];
+//             setCities(predefinedCities.map(city => ({
+//                 name: city.name,
+//                 image: city.image,
+//                 jobCount: 0
+//             })));
+//         }
+//     };
+
+//     const scrollCompanies = (direction) => {
+//         const row = companiesScrollContainerRef.current;
+//         if (!row) return;
+
+//         const pageWidth = row.clientWidth;
+//         const startScroll = row.scrollLeft;
+//         const maxScroll = Math.max(0, row.scrollWidth - row.clientWidth);
+//         const targetScroll = direction === 'left'
+//             ? Math.max(0, startScroll - pageWidth)
+//             : Math.min(maxScroll, startScroll + pageWidth);
+
+//         row.scrollTo({
+//             left: targetScroll,
+//             behavior: 'smooth',
+//         });
+//     };
+
+//     const scrollStories = (direction) => {
+//         const ref = storiesScrollRef.current;
+//         if (!ref) return;
+
+//         const viewportWidth = window.innerWidth;
+//         const cardsPerPage = viewportWidth <= 767 ? 1 : viewportWidth <= 1199 ? 2 : 3;
+//         const firstCard = ref.querySelector('.story-card');
+//         if (!firstCard) return;
+
+//         const gap = parseFloat(window.getComputedStyle(ref).columnGap || window.getComputedStyle(ref).gap || '0') || 0;
+//         const cardStep = firstCard.getBoundingClientRect().width + gap;
+//         const scrollAmount = cardStep * cardsPerPage;
+//         const currentScroll = ref.scrollLeft;
+//         const newScroll = direction === 'left'
+//             ? currentScroll - scrollAmount
+//             : currentScroll + scrollAmount;
+
+//         ref.scrollTo({
+//             left: newScroll,
+//             behavior: 'smooth'
+//         });
+//     };
+
+//     const getTrendingJobIcon = (jobTitle) => {
+//         if (!jobTitle) return 'ti-briefcase';
+
+//         const lowerTitle = jobTitle.toLowerCase();
+
+//         // Check in order of specificity
+//         if (lowerTitle.includes('full stack')) {
+//             return 'ti-desktop';
+//         } else if (lowerTitle.includes('ai engineer')) {
+//             return 'ti-settings';
+//         } else if (lowerTitle.includes('prompt engineer')) {
+//             return 'ti-pencil';
+//         } else if (lowerTitle.includes('cybersecurity') || lowerTitle.includes('security')) {
+//             return 'ti-lock';
+//         } else if (lowerTitle.includes('data analyst')) {
+//             return 'ti-stats-up';
+//         } else if (lowerTitle.includes('sales')) {
+//             return 'ti-shopping-cart';
+//         } else if (lowerTitle.includes('digital marketing')) {
+//             return 'ti-paint-bucket';
+//         } else if (lowerTitle.includes('financial') || lowerTitle.includes('investment')) {
+//             return 'ti-credit-card';
+//         } else if (lowerTitle.includes('marketing manager')) {
+//             return 'ti-paint-bucket';
+//         } else if (lowerTitle.includes('healthcare') || lowerTitle.includes('wellness')) {
+//             return 'ti-heart';
+//         } else if (lowerTitle.includes('operations') || lowerTitle.includes('project coordinator')) {
+//             return 'ti-clipboard';
+//         } else if (lowerTitle.includes('developer')) {
+//             return 'ti-desktop';
+//         } else if (lowerTitle.includes('analyst')) {
+//             return 'ti-stats-up';
+//         } else if (lowerTitle.includes('marketing')) {
+//             return 'ti-paint-bucket';
+//         }
+//         return 'ti-briefcase'; // Default icon
+//     };
+
+//     const trendingJobs = [
+//         { title: 'Full Stack Developer', searchTerm: 'Full Stack Developer' },
+//         { title: 'AI Engineer', searchTerm: 'AI Engineer' },
+//         { title: 'Prompt Engineer', searchTerm: 'Prompt Engineer' },
+//         { title: 'Cybersecurity Specialist', searchTerm: 'Cybersecurity' },
+//         { title: 'Data Analyst', searchTerm: 'Data Analyst' },
+//         { title: 'Sales Specialist', searchTerm: 'Sales' },
+//         { title: 'Digital Marketing Specialist', searchTerm: 'Digital Marketing' },
+//         { title: 'Financial Analyst', searchTerm: 'Financial Analyst' },
+//         { title: 'Marketing Manager', searchTerm: 'Marketing Manager' },
+//         { title: 'Healthcare & Wellness', searchTerm: 'Healthcare' },
+//         { title: 'Operations & Project Coordinator', searchTerm: 'Operations' }
+//     ];
+
+//     const getCategoryImage = (category) => {
+//         const imageMap = {
+//             'technology': 'information technology.png',
+//             'information technology': 'information technology.png',
+//             'it': 'motherboard.png',
+//             'software': 'motherboard.png',
+//             'marketing': 'marketing 2.png',
+//             'healthcare': 'healthcare.png',
+//             'health': 'healthcare.png',
+//             'medical': 'healthcare.png',
+//             'education': 'training.png',
+//             'training': 'training.png',
+//             'finance': 'loan.png',
+//             'banking': 'loan.png',
+//             'loan': 'loan.png',
+//             'support': 'technicalsupport.png',
+//             'technical': 'technicalsupport.png',
+//             'customer service': 'technicalsupport.png',
+//             'mechanic': 'mechanic.png',
+//             'mechanical': 'mechanic.png',
+//             'automotive': 'mechanic.png',
+//             // Map any "other"/"others" style category names to the Others image
+//             'other': 'Others 1.png',
+//             'others': 'Others 1.png',
+//             'consultant': 'consultant.png',
+//             'consulting': 'consultant.png',
+//             'advisory': 'consultant.png'
+//         };
+
+//         const lowerCategory = category?.toLowerCase() || '';
+//         for (const key in imageMap) {
+//             if (lowerCategory.includes(key.toLowerCase()) || lowerCategory === key) {
+//                 return `/assets/img/${imageMap[key]}`;
+//             }
+//         }
+//         return '/assets/img/motherboard.png'; // Default image
+//     };
+
+//     const formatJobType = (type) => {
+//         if (!type) return 'Full Time';
+//         return type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+//     };
+
+//     const JobCard = ({ job }) => {
+//         const jobUrl = `/jobs/${createSlug(job.title)}-${job.id}`;
+//         const isApplied = appliedJobIds.has(String(job.id));
+//         const prettifyText = (val) => {
+//             if (!val) return '';
+//             return String(val)
+//                 .replace(/_/g, ' ')
+//                 .replace(/\s+/g, ' ')
+//                 .trim()
+//                 .split(' ')
+//                 .map(w => (w ? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() : ''))
+//                 .join(' ');
+//         };
+
+//         return (
+//             <div className="col-md-4 col-sm-6 latest-job-col">
+//                 <div
+//                     className="latest-job-card"
+//                     role="button"
+//                     tabIndex={0}
+//                     onClick={() => navigate(jobUrl)}
+//                     onKeyDown={(e) => {
+//                         if (e.key === 'Enter' || e.key === ' ') navigate(jobUrl);
+//                     }}
+//                 >
+//                     <div className="job-card-top">
+//                         <span className="job-type-badge">{formatJobType(job.type)}</span>
+//                         <WishlistButton jobId={job.id} style={{ marginLeft: 'auto' }} />
+//                     </div>
+
+//                     <h3 className="job-title">
+//                         <Link to={jobUrl} onClick={(e) => e.stopPropagation()}>
+//                             {prettifyText(job.title)}
+//                         </Link>
+//                     </h3>
+
+//                     <div className="job-meta">
+//                         <div className="job-meta-row">
+//                             <i className="ti-briefcase" aria-hidden="true" />
+//                             <span className="job-meta-text">{prettifyText(job.company)}</span>
+//                         </div>
+//                         <div className="job-meta-row">
+//                             <i className="ti-location-pin" aria-hidden="true" />
+//                             <span className="job-meta-text">{prettifyText(job.location)}</span>
+//                         </div>
+//                     </div>
+
+//                     <div className="job-card-footer">
+//                         <div className="footer-left">
+//                             <img
+//                                 src={job.logo}
+//                                 alt={job.company}
+//                                 className="company-logo"
+//                                 onError={(e) => { e.target.src = '/assets/img/company_logo_1.png'; }}
+//                             />
+//                             <div className="posted-wrap">
+//                                 <div className="posted-label">Posted on</div>
+//                                 <div className="posted-date">
+//                                     {new Date(job.postedAt).toLocaleDateString()}
+//                                 </div>
+//                             </div>
+//                         </div>
+
+//                         {isApplied ? (
+//                             <span className="apply-btn applied-btn">
+//                                 <i className="ti-check" aria-hidden="true" />
+//                                 Applied
+//                             </span>
+//                         ) : (
+//                             <Link
+//                                 to={jobUrl}
+//                                 className="apply-btn"
+//                                 onClick={(e) => e.stopPropagation()}
+//                             >
+//                                 Apply Now
+//                             </Link>
+//                         )}
+//                     </div>
+//                 </div>
+//             </div>
+//         );
+//     };
+
+//     const visibleCategories = showAllCategories ? allCategories : categories;
+//     const shouldInfiniteScrollCategories = visibleCategories.length > 4;
+//     const categoryCards = shouldInfiniteScrollCategories
+//         ? [...visibleCategories, ...visibleCategories]
+//         : visibleCategories;
+
+//     return (
+//         <>
+//             <PageSEO
+//                 title="Job Consultancies in Odisha | Find Your Career with Uptula"
+//                 description="Looking for a job consultancy near me in Bhubaneswar? Uptula helps job seekers in Odisha find the right career opportunities quickly and easily. Connect with top employers today."
+//             />
+
+//             {/* =========================================================
+//                 Design tokens + shared component styles.
+//                 One accent (brand green), neutral ink/gray scale, hairline
+//                 borders instead of layered shadows, small consistent radii,
+//                 two purposeful typefaces, generous section rhythm.
+//                ========================================================= */}
+//             <style>{`
+//                 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+
+//                 .uh {
+//                     --ink: #17191C;
+//                     --ink-soft: #565F66;
+//                     --ink-faint: #8B939A;
+//                     --line: #E4E7E6;
+//                     --line-strong: #D3D8D6;
+//                     --surface: #FFFFFF;
+//                     --surface-alt: #F6F7F5;
+//                     --accent: #26AE61;
+//                     --accent-dark: #1E8D4D;
+//                     --accent-tint: #E9F5EC;
+//                     --radius-s: 4px;
+//                     --radius-m: 8px;
+//                     --radius-l: 10px;
+//                     --gap-section: 96px;
+//                     --font-head: 'Manrope', -apple-system, sans-serif;
+//                     --font-body: 'Inter', -apple-system, sans-serif;
+//                     font-family: var(--font-body);
+//                     color: var(--ink);
+//                 }
+
+//                 .uh h1, .uh h2, .uh h3, .uh h4 {
+//                     font-family: var(--font-head);
+//                     color: var(--ink);
+//                     letter-spacing: -0.01em;
+//                 }
+
+//                 .uh .uh-section { padding: var(--gap-section) 0; }
+//                 .uh .uh-container { max-width: 1180px; margin: 0 auto; padding: 0 20px; }
+
+//                 .uh .uh-eyebrow {
+//                     font-size: 13px;
+//                     font-weight: 600;
+//                     color: var(--accent-dark);
+//                     margin: 0 0 10px;
+//                 }
+
+//                 .uh .uh-heading {
+//                     font-size: 30px;
+//                     font-weight: 800;
+//                     line-height: 1.2;
+//                     margin: 0 0 10px;
+//                 }
+//                 .uh .uh-subhead {
+//                     font-size: 15px;
+//                     color: var(--ink-soft);
+//                     margin: 0;
+//                     max-width: 46ch;
+//                     line-height: 1.6;
+//                 }
+//                 .uh .uh-head-block { margin-bottom: 44px; }
+//                 .uh .uh-head-block--center { text-align: center; }
+//                 .uh .uh-head-block--center .uh-subhead { margin-left: auto; margin-right: auto; }
+
+//                 .uh .uh-btn {
+//                     display: inline-flex;
+//                     align-items: center;
+//                     justify-content: center;
+//                     gap: 8px;
+//                     padding: 12px 26px;
+//                     border-radius: var(--radius-m);
+//                     font-size: 14px;
+//                     font-weight: 600;
+//                     text-decoration: none;
+//                     cursor: pointer;
+//                     border: 1px solid transparent;
+//                     transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+//                 }
+//                 .uh .uh-btn--primary { background: var(--accent); color: #fff; }
+//                 .uh .uh-btn--primary:hover { background: var(--accent-dark); color: #fff; }
+//                 .uh .uh-btn--outline { background: transparent; color: var(--ink); border-color: var(--line-strong); }
+//                 .uh .uh-btn--outline:hover { border-color: var(--accent); color: var(--accent-dark); }
+
+//                 /* ---------- Hero ---------- */
+//                 .uh .hero-landing-banner {
+//                     background: var(--surface-alt);
+//                     padding: 88px 0;
+//                     border-bottom: 1px solid var(--line);
+//                 }
+//                 .uh .hero-landing-grid {
+//                     display: flex;
+//                     align-items: center;
+//                     justify-content: space-between;
+//                     gap: 56px;
+//                 }
+//                 .uh .hero-left { flex: 1 1 52%; min-width: 0; }
+//                 .uh .hero-right { flex: 1 1 44%; display: flex; justify-content: flex-end; }
+
+//                 .uh .hero-title {
+//                     font-size: 46px;
+//                     font-weight: 800;
+//                     line-height: 1.15;
+//                     margin: 0 0 18px;
+//                     max-width: 15ch;
+//                 }
+//                 .uh .hero-desc {
+//                     font-size: 16px;
+//                     color: var(--ink-soft);
+//                     line-height: 1.7;
+//                     margin: 0 0 32px;
+//                     max-width: 46ch;
+//                 }
+
+//                 .uh .hero-search {
+//                     background: var(--surface);
+//                     border: 1px solid var(--line-strong);
+//                     padding: 8px;
+//                     border-radius: var(--radius-l);
+//                     max-width: 560px;
+//                 }
+//                 .uh .hero-search-row { display: flex; align-items: center; gap: 8px; }
+//                 .uh .hero-field {
+//                     flex: 1.15 1 0;
+//                     display: flex;
+//                     align-items: center;
+//                     gap: 8px;
+//                     padding: 11px 14px;
+//                     background: var(--surface-alt);
+//                     border: 1px solid var(--line);
+//                     border-radius: var(--radius-m);
+//                     min-width: 0;
+//                 }
+//                 .uh .hero-field + .hero-field { flex: 1 1 0; }
+//                 .uh .hero-field i { font-size: 14px; color: var(--ink-faint); flex: 0 0 auto; }
+//                 .uh .hero-input {
+//                     font-size: 14px; border: none; outline: none; width: 100%;
+//                     background: transparent; color: var(--ink); padding: 0;
+//                 }
+//                 .uh .hero-input::placeholder { color: var(--ink-faint); }
+//                 .uh .hero-search-btn {
+//                     width: 46px; height: 46px; background: var(--accent);
+//                     border-radius: var(--radius-m); border: none; display: flex;
+//                     align-items: center; justify-content: center; color: #fff;
+//                     flex: 0 0 auto; cursor: pointer; text-decoration: none;
+//                     transition: background 150ms ease;
+//                 }
+//                 .uh .hero-search-btn:hover { background: var(--accent-dark); }
+
+//                 .uh .hero-image-frame {
+//                     position: relative;
+//                     width: 100%;
+//                     max-width: 460px;
+//                     min-height: 260px;
+//                 }
+//                 .uh .hero-find-job-bar {
+//                     position: absolute;
+//                     left: 0; bottom: 0;
+//                     background: var(--surface);
+//                     border-radius: var(--radius-l);
+//                     padding: 14px 18px;
+//                     border: 1px solid var(--line-strong);
+//                     display: flex; align-items: center; justify-content: space-between;
+//                     gap: 18px; width: 360px; max-width: 100%;
+//                 }
+//                 .uh .hero-find-job-text { font-size: 16px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+//                 .uh .hero-apply-floating-btn {
+//                     background: var(--accent); color: #fff; border-radius: var(--radius-m);
+//                     padding: 9px 18px; font-size: 13px; font-weight: 700; text-decoration: none;
+//                     white-space: nowrap; transition: background 150ms ease;
+//                 }
+//                 .uh .hero-apply-floating-btn:hover { background: var(--accent-dark); }
+
+//                 @media (max-width: 768px) {
+//                     .uh .hero-landing-banner { padding: 48px 0; }
+//                     .uh .hero-landing-grid { flex-direction: column; gap: 0; }
+//                     .uh .hero-right { display: none; }
+//                     .uh .hero-title { font-size: 32px; max-width: none; }
+//                     .uh .hero-desc { max-width: none; }
+//                     .uh .hero-search { max-width: none; }
+//                     .uh .hero-search-row { flex-wrap: wrap; }
+//                     .uh .hero-search-btn { width: 100%; height: 44px; }
+//                 }
+
+//                 /* ---------- Jobs near you ---------- */
+//                 .uh .unear-section { padding: var(--gap-section) 0; background: var(--surface); }
+//                 .uh .unear-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 32px; }
+//                 .uh .unear-title span { color: var(--accent-dark); }
+//                 .uh .unear-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+//                 .uh .unear-card {
+//                     background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-l);
+//                     padding: 18px; cursor: pointer; display: flex; flex-direction: column; gap: 12px;
+//                     transition: border-color 150ms ease;
+//                 }
+//                 .uh .unear-card:hover { border-color: var(--accent); }
+//                 .uh .unear-card-top { display: flex; align-items: center; gap: 10px; }
+//                 .uh .unear-logo { width: 42px; height: 42px; border-radius: var(--radius-s); border: 1px solid var(--line); object-fit: contain; background: var(--surface-alt); flex-shrink: 0; }
+//                 .uh .unear-jt { font-size: 15px; font-weight: 700; margin: 0; line-height: 1.3; }
+//                 .uh .unear-co { font-size: 13px; color: var(--ink-soft); margin: 2px 0 0; }
+//                 .uh .unear-meta { display: flex; flex-direction: column; gap: 8px; font-size: 12.5px; color: var(--ink-soft); }
+//                 .uh .unear-loc { display: flex; align-items: center; gap: 6px; }
+//                 .uh .unear-loc i { color: var(--ink-faint); }
+//                 .uh .unear-pay { display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; color: var(--accent-dark); font-weight: 700; }
+//                 .uh .unear-pay svg { width: 12px; height: 12px; }
+//                 .uh .unear-chip {
+//                     align-self: flex-start; border: 1px solid var(--line-strong); color: var(--ink-soft);
+//                     font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: var(--radius-s);
+//                     text-transform: capitalize;
+//                 }
+//                 .uh .unear-viewall { margin-top: 28px; text-align: center; }
+//                 @media (max-width: 991px) { .uh .unear-grid { grid-template-columns: repeat(2, 1fr); } }
+//                 @media (max-width: 575px) { .uh .unear-grid { grid-template-columns: 1fr; } }
+
+//                 /* ---------- How it works ---------- */
+//                 .uh .uhiw-section { padding: var(--gap-section) 0; background: var(--surface-alt); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+//                 .uh .uhiw-steps-wrap { position: relative; }
+//                 .uh .uhiw-steps-wrap::before {
+//                     content: ''; position: absolute; top: 34px; left: 12.5%; right: 12.5%; height: 1px; background: var(--line-strong);
+//                 }
+//                 .uh .uhiw-steps-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; position: relative; }
+//                 .uh .uhiw-step-col { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 0 14px; }
+//                 .uh .uhiw-circle {
+//                     width: 68px; height: 68px; border-radius: 50%; background: var(--surface);
+//                     border: 1px solid var(--line-strong); display: flex; align-items: center; justify-content: center;
+//                     position: relative; z-index: 1; margin-bottom: 18px;
+//                 }
+//                 .uh .uhiw-step-col--active .uhiw-circle { border-color: var(--accent); color: var(--accent); }
+//                 .uh .uhiw-ico { font-size: 24px; color: var(--ink-soft); }
+//                 .uh .uhiw-step-col:nth-child(1) .uhiw-ico,
+//                 .uh .uhiw-step-col:nth-child(2) .uhiw-ico,
+//                 .uh .uhiw-step-col:nth-child(3) .uhiw-ico { color: var(--accent-dark); }
+//                 .uh .uhiw-card-title { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+//                 .uh .uhiw-card-desc { font-size: 13.5px; color: var(--ink-soft); line-height: 1.6; max-width: 240px; margin: 0 auto; }
+//                 @media (max-width: 767px) {
+//                     .uh .uhiw-steps-row { grid-template-columns: repeat(2, 1fr); gap: 40px 0; }
+//                     .uh .uhiw-steps-wrap::before { display: none; }
+//                 }
+
+//                 /* ---------- Job cards (Latest / Featured) ---------- */
+//                 .uh .latest-job-col { display: flex; margin-bottom: 20px; }
+//                 .uh .latest-job-card {
+//                     background: var(--surface); border-radius: var(--radius-l); padding: 22px;
+//                     border: 1px solid var(--line); display: flex; flex-direction: column; gap: 16px;
+//                     height: 100%; width: 100%; cursor: pointer; transition: border-color 150ms ease;
+//                 }
+//                 .uh .latest-job-card:hover { border-color: var(--accent); }
+//                 .uh .job-card-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+//                 .uh .job-type-badge {
+//                     font-size: 11.5px; font-weight: 600; padding: 4px 10px; border-radius: var(--radius-s);
+//                     border: 1px solid var(--line-strong); color: var(--ink-soft); background: var(--surface-alt);
+//                 }
+//                 .uh .job-title { font-size: 18px; font-weight: 700; line-height: 1.3; margin: 0; }
+//                 .uh .job-title a { color: inherit; text-decoration: none; }
+//                 .uh .job-title a:hover { color: var(--accent-dark); }
+//                 .uh .job-meta { display: flex; flex-direction: column; gap: 8px; }
+//                 .uh .job-meta-row { display: flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 500; color: var(--ink-soft); min-width: 0; }
+//                 .uh .job-meta-row i { font-size: 13px; color: var(--accent-dark); flex: 0 0 auto; }
+//                 .uh .job-meta-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+//                 .uh .job-card-footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: auto; padding-top: 14px; border-top: 1px solid var(--line); }
+//                 .uh .footer-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+//                 .uh .company-logo { width: 38px; height: 38px; border-radius: var(--radius-s); object-fit: contain; border: 1px solid var(--line); background: var(--surface); padding: 2px; flex: 0 0 auto; }
+//                 .uh .posted-label { font-size: 11px; font-weight: 500; color: var(--ink-faint); margin: 0; line-height: 1.2; }
+//                 .uh .posted-date { font-size: 13px; font-weight: 600; color: var(--ink); margin: 2px 0 0; line-height: 1.2; }
+//                 .uh .apply-btn {
+//                     font-size: 12.5px; font-weight: 600; padding: 7px 14px; border-radius: var(--radius-m);
+//                     border: 1px solid var(--accent); color: var(--accent-dark); background: transparent;
+//                     text-decoration: none; white-space: nowrap; transition: background 150ms ease, color 150ms ease;
+//                 }
+//                 .uh .apply-btn:hover { background: var(--accent); color: #fff; text-decoration: none; }
+//                 .uh .applied-btn, .uh .applied-btn:hover {
+//                     display: flex; align-items: center; gap: 6px; color: var(--ink-soft); font-weight: 600;
+//                     font-size: 13px; background: transparent; border: none; padding: 0; cursor: default; text-decoration: none;
+//                 }
+//                 .uh .nav-tabs.nav-advance { border: none; gap: 8px; }
+//                 .uh .nav-tabs.nav-advance .nav-link {
+//                     border-radius: var(--radius-m) !important; font-weight: 600; font-size: 14px;
+//                     padding: 10px 18px; color: var(--ink-soft);
+//                 }
+//                 .uh .nav-tabs.nav-advance .nav-item.active .nav-link {
+//                     background: var(--ink) !important; color: #fff !important;
+//                 }
+
+//                 /* ---------- Career path chips ---------- */
+//                 .uh .urole-section { padding: var(--gap-section) 0; background: var(--surface); }
+//                 .uh .urole-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+//                 .uh .urole-chip {
+//                     display: inline-flex; align-items: center; gap: 8px; background: var(--surface);
+//                     border: 1px solid var(--line-strong); border-radius: var(--radius-m); padding: 10px 18px;
+//                     font-size: 13.5px; font-weight: 600; color: var(--ink); cursor: pointer;
+//                     transition: border-color 150ms ease, color 150ms ease;
+//                 }
+//                 .uh .urole-chip i { color: var(--accent-dark); }
+//                 .uh .urole-chip:hover { border-color: var(--accent); color: var(--accent-dark); }
+
+//                 /* ---------- Categories ---------- */
+//                 .uh .ucat-section { padding: var(--gap-section) 0; background: var(--surface-alt); border-top: 1px solid var(--line); }
+//                 .uh .ucat-scroll { display: flex; overflow-x: auto; gap: 14px; padding: 4px 2px 14px; scrollbar-width: none; -ms-overflow-style: none; }
+//                 .uh .ucat-scroll::-webkit-scrollbar { display: none; }
+//                 .uh .ucat-card {
+//                     min-width: 260px; width: 260px; background: var(--surface); border: 1px solid var(--line);
+//                     border-radius: var(--radius-l); padding: 14px; display: flex; align-items: center; gap: 14px;
+//                     cursor: pointer; flex-shrink: 0; transition: border-color 150ms ease;
+//                 }
+//                 .uh .ucat-card:hover { border-color: var(--accent); }
+//                 .uh .ucat-img-wrap { width: 56px; height: 56px; border-radius: var(--radius-m); background: var(--surface-alt); display: flex; align-items: center; justify-content: center; flex-shrink: 0; padding: 10px; border: 1px solid var(--line); }
+//                 .uh .ucat-img-wrap img { width: 100%; height: 100%; object-fit: contain; }
+//                 .uh .ucat-name { margin: 0 0 6px; font-size: 14.5px; font-weight: 700; line-height: 1.3; }
+//                 .uh .ucat-count { font-size: 12px; font-weight: 600; color: var(--accent-dark); }
+//                 .uh .ucat-arrow { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--line-strong); display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--ink-soft); }
+//                 .uh .ucat-empty { text-align: center; padding: 60px 40px; width: 100%; background: var(--surface); border-radius: var(--radius-l); border: 1px dashed var(--line-strong); }
+
+//                 /* ---------- Trending roles ---------- */
+//                 .uh .utrend-section { padding: var(--gap-section) 0; background: var(--surface); }
+//                 .uh .utrend-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+//                 .uh .utrend-card {
+//                     display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: var(--surface);
+//                     border: 1px solid var(--line); border-radius: var(--radius-m); cursor: pointer; flex: 1 1 200px;
+//                     transition: border-color 150ms ease;
+//                 }
+//                 .uh .utrend-card:hover { border-color: var(--accent); }
+//                 .uh .utrend-card i { font-size: 17px; color: var(--accent-dark); flex: 0 0 auto; }
+//                 .uh .utrend-card span { font-size: 13.5px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+//                 /* ---------- Companies ---------- */
+//                 .uh .dream-companies { padding: var(--gap-section) 0; background: var(--surface-alt); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+//                 .uh .companies-carousel-wrap { position: relative; padding: 0 56px; }
+//                 .uh .companies-nav-btn {
+//                     position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 40px;
+//                     border-radius: 50%; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink);
+//                     display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 20px; z-index: 5;
+//                     transition: border-color 150ms ease, color 150ms ease;
+//                 }
+//                 .uh .companies-nav-btn:hover { border-color: var(--accent); color: var(--accent-dark); }
+//                 .uh .companies-nav-btn--left { left: 0; }
+//                 .uh .companies-nav-btn--right { right: 0; }
+//                 .uh .companies-scroll-viewport { overflow: hidden; width: 100%; }
+//                 .uh .companies-scroll-container {
+//                     --companies-gap: 16px; --companies-per-view: 4; display: flex; gap: var(--companies-gap);
+//                     overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; scroll-behavior: smooth;
+//                     scroll-snap-type: x mandatory; padding: 4px 0; width: 100%; box-sizing: border-box;
+//                 }
+//                 .uh .companies-scroll-container::-webkit-scrollbar { display: none; }
+//                 .uh .company-card {
+//                     background: var(--surface); border-radius: var(--radius-l); padding: 26px 18px;
+//                     border: 1px solid var(--line); text-align: center; display: flex; flex-direction: column;
+//                     align-items: center; gap: 10px; cursor: pointer; transition: border-color 150ms ease;
+//                     flex: 0 0 calc((100% - (var(--companies-per-view) - 1) * var(--companies-gap)) / var(--companies-per-view));
+//                     width: calc((100% - (var(--companies-per-view) - 1) * var(--companies-gap)) / var(--companies-per-view));
+//                     min-width: 0; box-sizing: border-box; scroll-snap-align: start;
+//                 }
+//                 .uh .company-card:hover { border-color: var(--accent); }
+//                 .uh .company-logo-wrap { width: 48px; height: 48px; border-radius: var(--radius-m); overflow: hidden; background: var(--surface-alt); border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; }
+//                 .uh .company-logo-wrap img { width: 100%; height: 100%; object-fit: contain; padding: 2px; }
+//                 .uh .company-name { font-size: 16px; font-weight: 700; margin: 0; line-height: 1.3; word-break: break-word; }
+//                 .uh .company-meta { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; color: var(--ink-soft); flex-wrap: wrap; }
+//                 .uh .company-meta i { color: var(--ink-faint); }
+//                 .uh .company-openings { font-size: 13px; font-weight: 600; color: var(--accent-dark); }
+//                 @media (max-width: 1199px) { .uh .companies-scroll-container { --companies-per-view: 3; } }
+//                 @media (max-width: 991px) {
+//                     .uh .companies-carousel-wrap { display: grid; grid-template-columns: 40px 1fr 40px; align-items: center; column-gap: 8px; padding: 0 6px; }
+//                     .uh .companies-nav-btn { position: relative; left: auto; right: auto; top: auto; transform: none; }
+//                     .uh .companies-scroll-viewport { grid-column: 2; }
+//                     .uh .companies-scroll-container { --companies-per-view: 1; --companies-gap: 14px; display: grid; grid-auto-flow: column; grid-auto-columns: 100%; }
+//                     .uh .company-card { width: 100%; min-width: 100%; max-width: 100%; }
+//                     .uh .dream-companies-view-more-wrap { grid-column: 1 / -1; margin-top: 22px; }
+//                 }
+
+//                 /* ---------- Cities ---------- */
+//                 .uh .ucities-section { padding: var(--gap-section) 0; background: var(--surface); }
+//                 .uh .ucities-scroll { display: flex; gap: 16px; justify-content: center; flex-wrap: nowrap; padding: 4px 0; scrollbar-width: none; -ms-overflow-style: none; }
+//                 .uh .ucities-scroll::-webkit-scrollbar { display: none; }
+//                 .uh .ucity-card {
+//                     position: relative; height: 220px; width: 210px; flex: 0 0 auto; border-radius: var(--radius-l);
+//                     overflow: hidden; cursor: pointer; border: 1px solid var(--line);
+//                     background-size: 130%; background-position: center; background-repeat: no-repeat; background-color: var(--surface-alt);
+//                 }
+//                 .uh .ucity-card::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(255,255,255,0.0) 40%, rgba(23,25,28,0.55) 100%); }
+//                 .uh .ucity-top { position: absolute; top: 16px; left: 16px; right: 16px; z-index: 1; display: flex; justify-content: space-between; align-items: center; }
+//                 .uh .ucity-name { font-size: 15px; font-weight: 700; color: var(--ink); margin: 0; background: rgba(255,255,255,0.85); padding: 4px 10px; border-radius: var(--radius-s); }
+//                 .uh .ucity-bottom { position: absolute; bottom: 14px; left: 16px; right: 16px; z-index: 1; }
+//                 .uh .ucity-count { font-size: 12.5px; font-weight: 600; color: #fff; }
+//                 @media (max-width: 767px) { .uh .ucities-scroll { overflow-x: auto; justify-content: flex-start; } }
+
+//                 /* ---------- Testimonials ---------- */
+//                 .uh .testimonials-section { padding: var(--gap-section) 0; background: var(--surface-alt); border-top: 1px solid var(--line); }
+//                 .uh .stories-viewport { margin: 0 48px; overflow: hidden; }
+//                 .uh .stories-scroll-container { display: flex; gap: 16px; overflow-x: auto; padding: 4px 0; scroll-behavior: smooth; scrollbar-width: none; -ms-overflow-style: none; scroll-snap-type: x mandatory; }
+//                 .uh .stories-scroll-container::-webkit-scrollbar { display: none; }
+//                 .uh .story-card {
+//                     width: calc((100% - 32px) / 3); min-width: calc((100% - 32px) / 3); max-width: calc((100% - 32px) / 3);
+//                     flex: 0 0 calc((100% - 32px) / 3); scroll-snap-align: start; background: var(--surface);
+//                     border-radius: var(--radius-l); padding: 22px; border: 1px solid var(--line);
+//                 }
+//                 .uh .story-text { margin: 0; color: var(--ink); font-size: 14px; line-height: 1.7; }
+//                 .uh .story-person { display: flex; align-items: center; gap: 12px; margin-top: 18px; }
+//                 .uh .story-avatar { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; }
+//                 .uh .story-name { font-weight: 700; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+//                 .uh .story-role { color: var(--ink-soft); font-weight: 500; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+//                 .uh .stories-nav-btn {
+//                     position: absolute; top: 50%; transform: translateY(-50%); width: 38px; height: 38px; border-radius: 50%;
+//                     border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); cursor: pointer;
+//                     z-index: 5; display: flex; align-items: center; justify-content: center; font-size: 20px;
+//                     transition: border-color 150ms ease, color 150ms ease;
+//                 }
+//                 .uh .stories-nav-btn:hover { border-color: var(--accent); color: var(--accent-dark); }
+//                 @media (max-width: 1199px) {
+//                     .uh .stories-viewport { margin: 0 42px; }
+//                     .uh .story-card { width: calc((100% - 16px) / 2); min-width: calc((100% - 16px) / 2); max-width: calc((100% - 16px) / 2); flex: 0 0 calc((100% - 16px) / 2); }
+//                 }
+//                 @media (max-width: 767px) {
+//                     .uh .stories-viewport { margin: 0 10px; }
+//                     .uh .story-card { width: 100%; min-width: 100%; max-width: 100%; flex: 0 0 100%; }
+//                     .uh .stories-nav-btn { display: none; }
+//                 }
+
+//                 /* ---------- Sponsorships ---------- */
+//                 .uh .usponsor-section { padding: var(--gap-section) 0; background: var(--surface); }
+//                 .uh .usponsor-card {
+//                     display: flex; align-items: flex-start; gap: 14px; background: var(--surface); border: 1px solid var(--line);
+//                     border-radius: var(--radius-l); padding: 18px; height: 100%; transition: border-color 150ms ease;
+//                 }
+//                 .uh .usponsor-card:hover { border-color: var(--accent); }
+//                 .uh .usponsor-ico { width: 38px; height: 38px; border-radius: var(--radius-m); background: var(--accent-tint); color: var(--accent-dark); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+//                 .uh .usponsor-title { font-size: 15px; font-weight: 700; margin: 0 0 4px; }
+//                 .uh .usponsor-company { font-size: 13px; color: var(--ink-soft); margin: 0; }
+
+//                 @media (prefers-reduced-motion: reduce) {
+//                     .uh * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+//                 }
+//             `}</style>
+
+//             <div className="uh">
+//                 <Header />
+//                 <div className={showGuestMobileHero ? 'home--guest-mobile-hero' : ''}>
+//                     {showGuestMobileHero ? (
+//                         <GuestMobileHero
+//                             searchKeyword={searchKeyword}
+//                             setSearchKeyword={setSearchKeyword}
+//                             onSearch={submitHeroSearch}
+//                         />
+//                     ) : null}
+
+//                     {/* ======================= Hero ===================== */}
+//                     <div className="hero-landing-banner">
+//                         <div className="uh-container">
+//                             <div className="hero-landing-grid">
+//                                 <div className="hero-left">
+//                                     <h1 className="hero-title">Put your CV in front of your next job.</h1>
+//                                     <p className="hero-desc">
+//                                         Explore opportunities that match your skills and passions, and land the job you've always wanted with Uptula.
+//                                     </p>
+
+//                                     <form
+//                                         onSubmit={(e) => {
+//                                             e.preventDefault();
+//                                             submitHeroSearch();
+//                                         }}
+//                                     >
+//                                         <fieldset style={{ border: 'none', padding: 0, margin: 0 }}>
+//                                             <div className="hero-search">
+//                                                 <div className="hero-search-row">
+//                                                     <div className="hero-field">
+//                                                         <i className="ti-search" aria-hidden="true" />
+//                                                         <input
+//                                                             type="text"
+//                                                             className="hero-input"
+//                                                             placeholder="Search keywords..."
+//                                                             value={searchKeyword}
+//                                                             onChange={(e) => setSearchKeyword(e.target.value)}
+//                                                         />
+//                                                     </div>
+
+//                                                     <div className="hero-field">
+//                                                         <i className="ti-location-pin" aria-hidden="true" />
+//                                                         <input
+//                                                             type="text"
+//                                                             className="hero-input"
+//                                                             list="hero-location-list"
+//                                                             placeholder={detectedCity ? `Location · detected ${detectedCity}` : 'Location'}
+//                                                             value={searchLocation}
+//                                                             onChange={(e) => setSearchLocation(e.target.value)}
+//                                                         />
+//                                                         <datalist id="hero-location-list">
+//                                                             {[...new Set([detectedCity, ...HERO_LOCATIONS].filter(Boolean))].map((city) => (
+//                                                                 <option key={city} value={city} />
+//                                                             ))}
+//                                                         </datalist>
+//                                                     </div>
+
+//                                                     <button type="submit" className="hero-search-btn" aria-label="Search">
+//                                                         <i className="ti-search" aria-hidden="true" />
+//                                                     </button>
+//                                                 </div>
+//                                             </div>
+//                                         </fieldset>
+//                                     </form>
+//                                 </div>
+
+//                                 <div className="hero-right">
+//                                     <div className="hero-image-frame">
+//                                         <div className="hero-find-job-bar">
+//                                             <div className="hero-find-job-text">Find a perfect job</div>
+//                                             <Link to="/jobs" className="hero-apply-floating-btn">
+//                                                 Apply Now
+//                                             </Link>
+//                                         </div>
+//                                     </div>
+//                                 </div>
+//                             </div>
+//                         </div>
+//                     </div>
+//                     {/* ======================= End Hero ===================== */}
+//                 </div>
+
+//                 {/* ================= Jobs Near You (geolocation) ========================= */}
+//                 {nearbyJobs.length > 0 && (
+//                     <section className="unear-section">
+//                         <div className="uh-container">
+//                             <div className="unear-head">
+//                                 <h2 className="uh-heading unear-title">Jobs near you in <span>{detectedCity}</span></h2>
+//                             </div>
+//                             <div className="unear-grid">
+//                                 {nearbyJobs.slice(0, 8).map((job, i) => {
+//                                     const id = job.id || job._id;
+//                                     const title = job.jobTitle || job.title || 'Job Opening';
+//                                     const co = job.companyName || job.company || 'Company';
+//                                     const loc = [job.city, job.state].filter(Boolean).join(', ') || job.country || detectedCity;
+//                                     const salary = job.salaryRange && job.salaryRange !== 'negotiable' ? job.salaryRange : 'Negotiable';
+//                                     const jt = String(job.jobType || job.job_type || '').replace(/_/g, ' ');
+//                                     const logoPath = job.companyLogoUrl || job.company_logo;
+//                                     const logo = logoPath
+//                                         ? (String(logoPath).startsWith('http') ? logoPath : `${API_BASE_URL}${String(logoPath).startsWith('/') ? '' : '/'}${logoPath}`)
+//                                         : '/assets/img/company_logo_1.png';
+//                                     return (
+//                                         <div
+//                                             className="unear-card"
+//                                             key={id || i}
+//                                             onClick={() => navigate(`/jobs/${createSlug(title)}-${id}`)}
+//                                         >
+//                                             <div className="unear-card-top">
+//                                                 <img className="unear-logo" src={logo} alt={co} onError={(e) => { e.currentTarget.src = '/assets/img/company_logo_1.png'; }} />
+//                                                 <div style={{ minWidth: 0 }}>
+//                                                     <h3 className="unear-jt">{title}</h3>
+//                                                     <p className="unear-co">{co}</p>
+//                                                 </div>
+//                                             </div>
+//                                             {jt && <span className="unear-chip">{jt}</span>}
+//                                             <div className="unear-meta">
+//                                                 <span className="unear-loc"><i className="ti-location-pin" />{loc}</span>
+//                                                 <span className="unear-pay"><FaRupeeSign aria-hidden="true" />{salary}</span>
+//                                             </div>
+//                                         </div>
+//                                     );
+//                                 })}
+//                             </div>
+//                             <div className="unear-viewall">
+//                                 <button type="button" className="uh-btn uh-btn--primary" onClick={() => navigate(`/jobs?city=${encodeURIComponent(detectedCity)}`)}>
+//                                     View all jobs in {detectedCity}
+//                                 </button>
+//                             </div>
+//                         </div>
+//                     </section>
+//                 )}
+//                 {/* ================= Jobs Near You End ========================= */}
+
+//                 {/* ================= How It Works ========================= */}
+//                 <section className="uhiw-section">
+//                     <div className="uh-container">
+//                         <div className="uh-head-block uh-head-block--center">
+//                             <p className="uh-eyebrow">Four steps</p>
+//                             <h2 className="uh-heading">Land your dream job in four simple steps</h2>
+//                             <p className="uh-subhead" style={{ margin: '0 auto' }}>From building your profile to getting hired, Uptula makes your job search fast and effortless.</p>
+//                         </div>
+
+//                         <div className="uhiw-steps-wrap">
+//                             <motion.div
+//                                 className="uhiw-steps-row"
+//                                 initial="hidden"
+//                                 whileInView="show"
+//                                 viewport={{ once: true, margin: '-80px' }}
+//                                 variants={{ hidden: {}, show: { transition: { staggerChildren: 0.12 } } }}
+//                             >
+//                                 {[
+//                                     { Icon: LuUser, title: 'Create your profile', desc: 'Sign up and build a standout profile that recruiters love.' },
+//                                     { Icon: LuSearch, title: 'Search smart', desc: 'Filter thousands of jobs by role, location, salary and more.' },
+//                                     { Icon: LuZap, title: 'Apply in one click', desc: 'Apply instantly and track every application in one place.' },
+//                                     { icon: 'ti-medall', title: 'Get hired', desc: 'Connect with top companies and accelerate your career.' },
+//                                 ].map((s, i) => (
+//                                     <motion.div
+//                                         className={`uhiw-step-col${i < 3 ? ' uhiw-step-col--active' : ''}`}
+//                                         key={s.title}
+//                                         variants={{ hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0 } }}
+//                                         transition={{ duration: 0.4 }}
+//                                     >
+//                                         <div className="uhiw-circle">
+//                                             {s.Icon ? (
+//                                                 <s.Icon className="uhiw-ico" aria-hidden="true" strokeWidth={2} />
+//                                             ) : (
+//                                                 <i className={`ti ${s.icon} uhiw-ico`} aria-hidden="true" />
+//                                             )}
+//                                         </div>
+//                                         <div className="uhiw-card-title">{s.title}</div>
+//                                         <p className="uhiw-card-desc">{s.desc}</p>
+//                                     </motion.div>
+//                                 ))}
+//                             </motion.div>
+//                         </div>
+//                     </div>
+//                 </section>
+//                 {/* ================= How It Works End ========================= */}
+
+//                 {/* ================= Jobs Section ========================= */}
+//                 <section className="uh-section">
+//                     <div className="uh-container">
+//                         <div className="uh-head-block">
+//                             <h2 className="uh-heading">Open roles</h2>
+//                         </div>
+//                         <ul className="nav nav-tabs nav-advance theme-bg" role="tablist" style={{ marginBottom: '28px' }}>
+//                             <li className="nav-item active">
+//                                 <a className="nav-link" data-toggle="tab" href="#recent" role="tab">
+//                                     Latest Jobs
+//                                 </a>
+//                             </li>
+//                             <li className="nav-item">
+//                                 <a className="nav-link" data-toggle="tab" href="#featured" role="tab">
+//                                     Featured Jobs
+//                                 </a>
+//                             </li>
+//                         </ul>
+//                         <div className="tab-content">
+//                             <div className="tab-pane fade in show active" id="recent" role="tabpanel">
+//                                 <div className="row">
+//                                     {loading ? (
+//                                         <div className="col-12 text-center">
+//                                             <div className="spinner-border" role="status">
+//                                                 <span className="sr-only">Loading...</span>
+//                                             </div>
+//                                             <p>Loading latest jobs...</p>
+//                                         </div>
+//                                     ) : latestJobs.length > 0 ? (
+//                                         latestJobs.map((job) => <JobCard key={job.id} job={job} />)
+//                                     ) : (
+//                                         <div className="col-12 text-center">
+//                                             <p>No jobs available at the moment.</p>
+//                                         </div>
+//                                     )}
+//                                 </div>
+//                             </div>
+//                             <div className="tab-pane fade" id="featured" role="tabpanel">
+//                                 <div className="row">
+//                                     {loading ? (
+//                                         <div className="col-12 text-center">
+//                                             <div className="spinner-border" role="status">
+//                                                 <span className="sr-only">Loading...</span>
+//                                             </div>
+//                                             <p>Loading featured jobs...</p>
+//                                         </div>
+//                                     ) : featuredJobs.length > 0 ? (
+//                                         featuredJobs.map((job) => <JobCard key={job.id} job={job} />)
+//                                     ) : (
+//                                         <div className="col-12 text-center">
+//                                             <p>No featured jobs available at the moment.</p>
+//                                         </div>
+//                                     )}
+//                                 </div>
+//                             </div>
+//                         </div>
+//                         <div style={{ marginTop: '12px', textAlign: 'center' }}>
+//                             <Link to="/jobs" className="uh-btn uh-btn--outline">
+//                                 Browse All Jobs
+//                             </Link>
+//                         </div>
+//                     </div>
+//                 </section>
+//                 {/* ================= Jobs Section End ========================= */}
+
+//                 {/* ================= Career Path Chips ========================= */}
+//                 <section className="urole-section">
+//                     <div className="uh-container">
+//                         <div className="uh-head-block uh-head-block--center">
+//                             <h2 className="uh-heading">Find your ideal career path</h2>
+//                             <p className="uh-subhead" style={{ margin: '0 auto' }}>Explore opportunities tailored to the most in-demand career paths.</p>
+//                         </div>
+//                         <div className="urole-grid">
+//                             {[
+//                                 { icon: 'ti-desktop', label: 'Software Developer' },
+//                                 { icon: 'ti-bar-chart', label: 'Data Analyst' },
+//                                 { icon: 'ti-announcement', label: 'Digital Marketing' },
+//                                 { icon: 'ti-shopping-cart', label: 'Sales' },
+//                                 { icon: 'ti-pencil-alt', label: 'Designer' },
+//                                 { icon: 'ti-user', label: 'Human Resources' },
+//                                 { icon: 'ti-headphone-alt', label: 'Customer Support' },
+//                                 { icon: 'ti-wallet', label: 'Accountant' },
+//                                 { icon: 'ti-ruler-pencil', label: 'Civil Engineer' },
+//                                 { icon: 'ti-book', label: 'Teacher' },
+//                                 { icon: 'ti-heart', label: 'Nurse' },
+//                                 { icon: 'ti-truck', label: 'Driver' },
+//                             ].map((r) => (
+//                                 <button
+//                                     type="button"
+//                                     key={r.label}
+//                                     className="urole-chip"
+//                                     onClick={() => navigate(`/jobs?q=${encodeURIComponent(r.label)}`)}
+//                                 >
+//                                     <i className={r.icon} aria-hidden="true" />
+//                                     {r.label}
+//                                 </button>
+//                             ))}
+//                         </div>
+//                     </div>
+//                 </section>
+//                 {/* ================= Career Path Chips End ========================= */}
+
+//                 {/* ================= All Job Categories Section ========================= */}
+//                 <section className="ucat-section">
+//                     <div className="uh-container">
+//                         <div className="uh-head-block">
+//                             <h2 className="uh-heading">Explore jobs by category</h2>
+//                             <p className="uh-subhead">Browse opportunities across different fields.</p>
+//                         </div>
+
+//                         <div style={{ position: 'relative' }}>
+//                             <div ref={scrollContainerRef} className="ucat-scroll">
+//                                 {visibleCategories.length > 0 ? (
+//                                     categoryCards.map((category, idx) => (
+//                                         <div
+//                                             key={`${category.category || 'cat'}-${idx}`}
+//                                             className="ucat-card"
+//                                             onClick={() => {
+//                                                 trackSearch(category.category);
+//                                                 navigate(`/jobs?category=${encodeURIComponent(category.category)}`);
+//                                             }}
+//                                             onMouseEnter={() => { isScrollingPausedRef.current = true; }}
+//                                             onMouseLeave={() => { isScrollingPausedRef.current = false; }}
+//                                         >
+//                                             <div className="ucat-img-wrap">
+//                                                 <img
+//                                                     src={getCategoryImage(category.category)}
+//                                                     alt={formatCategoryName(category.category)}
+//                                                     onError={(e) => { e.target.src = '/assets/img/motherboard.png'; }}
+//                                                 />
+//                                             </div>
+//                                             <div style={{ flex: 1, minWidth: 0 }}>
+//                                                 <h4 className="ucat-name">{formatCategoryName(category.category)}</h4>
+//                                                 <span className="ucat-count">
+//                                                     {category.job_count || category.count || 0} {((category.job_count || category.count || 0) === 1) ? 'Job' : 'Jobs'}
+//                                                 </span>
+//                                             </div>
+//                                             <div className="ucat-arrow">
+//                                                 <FaChevronRight style={{ fontSize: '12px' }} />
+//                                             </div>
+//                                         </div>
+//                                     ))
+//                                 ) : (
+//                                     <div className="ucat-empty">
+//                                         <i className="ti-briefcase" style={{ fontSize: '48px', color: 'var(--line-strong)', marginBottom: '14px', display: 'block' }} />
+//                                         <p style={{ color: 'var(--ink-soft)', fontSize: '15px', margin: 0 }}>No categories available</p>
+//                                     </div>
+//                                 )}
+//                             </div>
+
+//                             {categories.length > 0 && !showAllCategories && allCategories.length > categories.length && (
+//                                 <div style={{ marginTop: '20px', textAlign: 'center' }}>
+//                                     <button className="uh-btn uh-btn--outline" onClick={() => setShowAllCategories(true)}>
+//                                         Load More Categories
+//                                     </button>
+//                                 </div>
+//                             )}
+//                         </div>
+//                     </div>
+//                 </section>
+//                 {/* ================= All Job Categories Section End ========================= */}
+
+//                 {/* ================= Trending Jobs Section ========================= */}
+//                 <section className="utrend-section">
+//                     <div className="uh-container">
+//                         <div className="uh-head-block">
+//                             <h2 className="uh-heading">Trending career opportunities</h2>
+//                         </div>
+//                         <div className="utrend-grid">
+//                             {trendingJobs.map((job, idx) => (
+//                                 <div
+//                                     key={idx}
+//                                     className="utrend-card"
+//                                     onClick={() => {
+//                                         trackSearch(job.searchTerm);
+//                                         navigate(`/jobs?q=${encodeURIComponent(job.searchTerm)}`);
+//                                     }}
+//                                 >
+//                                     <i className={`ti ${getTrendingJobIcon(job.title)}`} aria-hidden="true" />
+//                                     <span>{job.title}</span>
+//                                 </div>
+//                             ))}
+//                         </div>
+//                     </div>
+//                 </section>
+//                 {/* ================= Trending Jobs Section End ========================= */}
+
+//                 {/* ================= Companies Hiring Now ========================= */}
+//                 {companies.length > 0 && (
+//                     <section className="dream-companies">
+//                         <div className="uh-container">
+//                             <div className="uh-head-block uh-head-block--center">
+//                                 <h2 className="uh-heading">Companies hiring now</h2>
+//                                 <p className="uh-subhead" style={{ margin: '0 auto' }}>Discover your next career move, freelance gig, or internship.</p>
+//                             </div>
+
+//                             <div className="companies-carousel-wrap">
+//                                 <button onClick={() => scrollCompanies('left')} className="companies-nav-btn companies-nav-btn--left" aria-label="Scroll left">‹</button>
+//                                 <button onClick={() => scrollCompanies('right')} className="companies-nav-btn companies-nav-btn--right" aria-label="Scroll right">›</button>
+
+//                                 <div className="companies-scroll-viewport">
+//                                     <div ref={companiesScrollContainerRef} className="companies-scroll-container">
+//                                         {companies.map((company, idx) => (
+//                                             <div
+//                                                 key={idx}
+//                                                 onClick={() => navigate(`/company/${company.id}`, { state: { company } })}
+//                                                 className="company-card"
+//                                             >
+//                                                 <div className="company-logo-wrap">
+//                                                     <img
+//                                                         src={company.logo}
+//                                                         alt={company.name}
+//                                                         onError={(e) => { e.target.src = '/assets/img/company_logo_1.png'; }}
+//                                                     />
+//                                                 </div>
+
+//                                                 <h5 className="company-name">
+//                                                     {company.name.replace(/_/g, ' ').split(' ').map(word =>
+//                                                         word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+//                                                     ).join(' ')}
+//                                                     {Boolean(company.isVerified) && (
+//                                                         <img
+//                                                             src="/assets/img/bluetick.png"
+//                                                             alt="Verified"
+//                                                             style={{ width: '14px', height: '14px', marginLeft: '5px', verticalAlign: 'middle' }}
+//                                                         />
+//                                                     )}
+//                                                 </h5>
+
+//                                                 <div className="company-meta">
+//                                                     <i className="ti-location-pin" aria-hidden="true" />
+//                                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', flexWrap: 'wrap', minWidth: 0 }}>
+//                                                         {company.locations.length > 0 ? (
+//                                                             <>
+//                                                                 {company.locations.length === 1 ? (
+//                                                                     <span>{company.locations[0]}</span>
+//                                                                 ) : (
+//                                                                     <>
+//                                                                         <span>{company.locations[0]}</span>
+//                                                                         <span>,</span>
+//                                                                         <span>{company.locations[1]}</span>
+//                                                                         {company.locations.length > 2 && (
+//                                                                             <>
+//                                                                                 <span>,</span>
+//                                                                                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80px', display: 'inline-block' }}>
+//                                                                                     {company.locations[2]}
+//                                                                                 </span>
+//                                                                             </>
+//                                                                         )}
+//                                                                         {company.locations.length > 3 && <span>...</span>}
+//                                                                     </>
+//                                                                 )}
+//                                                             </>
+//                                                         ) : (
+//                                                             <span>N/A</span>
+//                                                         )}
+//                                                     </div>
+//                                                 </div>
+
+//                                                 <div className="company-openings">
+//                                                     {company.jobCount} Open {company.jobCount === 1 ? 'Job' : 'Jobs'}
+//                                                 </div>
+//                                             </div>
+//                                         ))}
+//                                     </div>
+//                                 </div>
+
+//                                 <div className="dream-companies-view-more-wrap" style={{ textAlign: 'center', marginTop: '28px' }}>
+//                                     <button type="button" className="uh-btn uh-btn--primary" onClick={() => navigate('/Companies')}>
+//                                         View More Companies
+//                                     </button>
+//                                 </div>
+//                             </div>
+//                         </div>
+//                     </section>
+//                 )}
+//                 {/* ================= Companies Hiring Now End ========================= */}
+
+//                 {/* ================= Find Jobs in Your City ========================= */}
+//                 {cities.length > 0 && (
+//                     <section className="ucities-section">
+//                         <div className="uh-container">
+//                             <div className="uh-head-block uh-head-block--center">
+//                                 <h2 className="uh-heading">Find jobs in your city</h2>
+//                                 <p className="uh-subhead" style={{ margin: '0 auto' }}>Discover opportunities in your preferred location.</p>
+//                             </div>
+
+//                             <div className="ucities-scroll">
+//                                 {cities.map((city, idx) => (
+//                                     <div
+//                                         key={idx}
+//                                         className="ucity-card"
+//                                         style={{ backgroundImage: `url(${city.image})` }}
+//                                         onClick={() => {
+//                                             trackSearch(city.name);
+//                                             navigate(`/jobs?city=${encodeURIComponent(city.name)}`);
+//                                         }}
+//                                     >
+//                                         <div className="ucity-top">
+//                                             <h3 className="ucity-name">{city.name}</h3>
+//                                         </div>
+//                                         <div className="ucity-bottom">
+//                                             <span className="ucity-count">
+//                                                 {city.jobCount === 0 ? 'No jobs yet' : `${city.jobCount} ${city.jobCount === 1 ? 'job' : 'jobs'}`}
+//                                             </span>
+//                                         </div>
+//                                     </div>
+//                                 ))}
+//                             </div>
+//                         </div>
+//                     </section>
+//                 )}
+//                 {/* ================= Find Jobs in Your City End ========================= */}
+
+//                 {/* ================= Success Stories ========================= */}
+//                 <section className="testimonials-section">
+//                     <div className="uh-container">
+//                         <div className="uh-head-block uh-head-block--center">
+//                             <p className="uh-eyebrow">Stories from our community</p>
+//                             <h2 className="uh-heading">Success stories</h2>
+//                         </div>
+
+//                         <div style={{ position: 'relative' }}>
+//                             <button onClick={() => scrollStories('left')} className="stories-nav-btn" style={{ left: 0 }} aria-label="Previous stories">‹</button>
+//                             <button onClick={() => scrollStories('right')} className="stories-nav-btn" style={{ right: 0 }} aria-label="Next stories">›</button>
+
+//                             <div className="stories-viewport">
+//                                 <div ref={storiesScrollRef} className="stories-scroll-container">
+//                                     {[
+//                                         { text: '"I found a few jobs that matched my skills and location. The listings were clear, and applying was quick and simple."', name: 'Ramesh Kumar', role: 'Electrician', photo: '/assets/img/stories/ramesh.jpg' },
+//                                         { text: '"The platform helped me find suitable work without wasting time. I could easily check different jobs and apply to the ones I liked."', name: 'Pooja Singh', role: 'Retail Sales Associate', photo: '/assets/img/stories/pooja.jpg' },
+//                                         { text: '"I liked how easy it was to search for jobs near me. I found roles that matched my experience and could apply quickly."', name: 'Imran Khan', role: 'Delivery Executive', photo: '/assets/img/stories/imran.jpg' },
+//                                         { text: '"There were many relevant jobs to choose from, and the application process was straightforward. It made my job search much easier."', name: 'Neha Patel', role: 'Customer Support Executive', photo: '/assets/img/stories/neha.jpg' },
+//                                         { text: '"We could post openings and start getting relevant applications quickly. It made the hiring process more organized for our team."', name: 'Vikram Sharma', role: 'HR Manager, Yubi Foods & Spices', photo: '/assets/img/stories/vikram.jpg' },
+//                                         { text: '"Managing multiple vacancies became easier with everything in one place. It helped us save time while finding suitable candidates."', name: 'Priya Mehta', role: 'Talent Acquisition Lead, Vikash', photo: '/assets/img/stories/priya.jpg' }
+//                                     ].map((story, idx) => (
+//                                         <div key={`${story.name}-${idx}`} className="story-card">
+//                                             <p className="story-text">{story.text}</p>
+//                                             <div className="story-person">
+//                                                 <img
+//                                                     src={story.photo}
+//                                                     alt={story.name}
+//                                                     className="story-avatar"
+//                                                     onError={(e) => { e.currentTarget.src = '/assets/img/user-profile.png'; }}
+//                                                 />
+//                                                 <div style={{ minWidth: 0 }}>
+//                                                     <div className="story-name">{story.name}</div>
+//                                                     <div className="story-role">{story.role}</div>
+//                                                 </div>
+//                                             </div>
+//                                         </div>
+//                                     ))}
+//                                 </div>
+//                             </div>
+//                         </div>
+//                     </div>
+//                 </section>
+//                 {/* ================= Success Stories End ========================= */}
+
+//                 {/* ================= App Download ========================= */}
+//                 <MobileAppDownload />
+//                 {/* ================= App Download End ========================= */}
+
+//                 {/* ================= Sponsorships ========================= */}
+//                 {sponsorships.length > 0 && (
+//                     <section className="usponsor-section">
+//                         <div className="uh-container">
+//                             <div className="uh-head-block uh-head-block--center">
+//                                 <h2 className="uh-heading">Featured sponsorships</h2>
+//                                 <p className="uh-subhead" style={{ margin: '0 auto' }}>Discover sponsorship opportunities from leading companies.</p>
+//                             </div>
+//                             <div className="row">
+//                                 {sponsorships.map((sponsorship, idx) => (
+//                                     <div key={idx} className="col-md-3 col-sm-6" style={{ marginBottom: '20px' }}>
+//                                         <Link to={sponsorship.link_url || `/jobs/${sponsorship.job_id || sponsorship.id}`} title={sponsorship.title} style={{ textDecoration: 'none' }}>
+//                                             <div className="usponsor-card">
+//                                                 <div className="usponsor-ico">
+//                                                     <i className="ti-star" aria-hidden="true" />
+//                                                 </div>
+//                                                 <div style={{ minWidth: 0 }}>
+//                                                     <h4 className="usponsor-title">{sponsorship.title}</h4>
+//                                                     <p className="usponsor-company">{sponsorship.company_name}</p>
+//                                                     {sponsorship.image_url && (
+//                                                         <img src={sponsorship.image_url} alt={sponsorship.company_name} style={{ maxWidth: '100%', marginTop: '10px', borderRadius: '4px' }} />
+//                                                     )}
+//                                                     {sponsorship.logo && !sponsorship.image_url && (
+//                                                         <img src={sponsorship.logo} alt={sponsorship.company_name} style={{ maxWidth: '90px', marginTop: '10px' }} />
+//                                                     )}
+//                                                 </div>
+//                                             </div>
+//                                         </Link>
+//                                     </div>
+//                                 ))}
+//                             </div>
+//                         </div>
+//                     </section>
+//                 )}
+//                 {/* ================= Sponsorships End ========================= */}
+
+//                 <Footer />
+//                 <Chatbot />
+//             </div>
+//         </>
+//     );
+// }
+
+// export default Home;
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
