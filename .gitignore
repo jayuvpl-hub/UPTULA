@@ -9,6 +9,7 @@ frontend/sitemap.xml
 backend/node_modules/
 backend/.env
 backend/.env.*
+!backend/.env.example
 backend/.htaccess
 backend/src/firebase-service-account.json
 

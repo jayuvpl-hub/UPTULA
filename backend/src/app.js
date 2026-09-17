@@ -25,6 +25,7 @@ const categoriesRoutes = require('./routes/categories.routes');
 const aiRoutes = require('./routes/ai.routes');
 const appRoutes = require('./routes/app.routes');
 const paymentRoutes = require('./routes/payment.routes')
+const webhookRoutes = require('./routes/webhook.routes');
 const path = require('path');
 const fs = require('fs');
 
@@ -33,6 +34,11 @@ const app = express();
 app.set('trust proxy', 1);
 app.use(helmet());
 app.use(morgan('dev'));
+
+// Razorpay webhooks need the unparsed body to verify their signature, so this
+// must be mounted ahead of express.json().
+app.use('/api/payments', webhookRoutes);
+
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -64,7 +70,7 @@ app.use('/api/categories', categoriesRoutes);
 app.use('/api/registration', categoriesRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/app', appRoutes);
-app.use('/api/paymentRoutes', paymentRoutes)
+app.use('/api/payments', paymentRoutes)
 
 // Device-aware redirect for app-link emails (mobile → Play Store, desktop → jobs page)
 app.get('/redirect', (req, res) => {

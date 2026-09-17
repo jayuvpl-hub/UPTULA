@@ -94,6 +94,31 @@ async function deleteUploadedFile(storedValue) {
   }
 }
 
+// --- Razorpay ---
+// Read through here rather than process.env at the call site so a missing
+// value fails at boot with a clear message instead of surfacing as an opaque
+// crypto error on the first webhook (createHmac throws on an undefined key).
+const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || '';
+const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || '';
+const RAZORPAY_WEBHOOK_SECRET = process.env.RAZORPAY_WEBHOOK_SECRET || '';
+
+const isLiveRazorpayKey = RAZORPAY_KEY_ID.startsWith('rzp_live_');
+
+function assertRazorpayConfig() {
+  const missing = [];
+  if (!RAZORPAY_KEY_ID) missing.push('RAZORPAY_KEY_ID');
+  if (!RAZORPAY_KEY_SECRET) missing.push('RAZORPAY_KEY_SECRET');
+  // Without this the webhook cannot verify signatures, which means no reliable
+  // fulfilment when the customer closes the tab before the browser callback runs.
+  if (!RAZORPAY_WEBHOOK_SECRET) missing.push('RAZORPAY_WEBHOOK_SECRET');
+
+  if (!missing.length) return;
+
+  const message = `Missing Razorpay environment variables: ${missing.join(', ')}`;
+  if (isProduction) throw new Error(message);
+  console.warn(`[env] ${message} — payment routes will be degraded.`);
+}
+
 const DB_CONFIG = {
   host: process.env.DB_HOST || 'localhost',
   port: Number(process.env.DB_PORT || 3306),
@@ -124,6 +149,11 @@ module.exports = {
   s3,
   s3KeyFromStoredValue,
   deleteUploadedFile,
+  RAZORPAY_KEY_ID,
+  RAZORPAY_KEY_SECRET,
+  RAZORPAY_WEBHOOK_SECRET,
+  isLiveRazorpayKey,
+  assertRazorpayConfig,
   DB_CONFIG,
 };
 // const path = require('path');

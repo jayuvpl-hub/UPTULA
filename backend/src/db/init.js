@@ -3,36 +3,6 @@ const { getPool } = require('./index');
 async function ensureDatabase() {
   const pool = getPool();
 
-  // Add FCM token column for push notifications (safe migration)
-  const [fcmColumnRows] = await pool.query(
-    `
-      SELECT COLUMN_NAME
-      FROM INFORMATION_SCHEMA.COLUMNS
-      WHERE TABLE_SCHEMA = DATABASE()
-        AND TABLE_NAME = 'users'
-        AND COLUMN_NAME = 'fcm_token'
-      LIMIT 1
-    `
-  );
-  if (!Array.isArray(fcmColumnRows) || fcmColumnRows.length === 0) {
-    await pool.query(`ALTER TABLE users ADD COLUMN fcm_token VARCHAR(255) DEFAULT NULL`);
-  }
-  // password_hash was CHAR(32) for md5; bcrypt reset hashes (~60 chars) were truncated in MySQL.
-  // Widen so md5 (32) or future bcrypt hashes fit.
-  const [pwdHashCol] = await pool.query(
-    `
-      SELECT CHARACTER_MAXIMUM_LENGTH AS maxlen
-      FROM INFORMATION_SCHEMA.COLUMNS
-      WHERE TABLE_SCHEMA = DATABASE()
-        AND TABLE_NAME = 'users'
-        AND COLUMN_NAME = 'password_hash'
-      LIMIT 1
-    `
-  );
-  if (Array.isArray(pwdHashCol) && pwdHashCol.length > 0 && Number(pwdHashCol[0].maxlen) < 255) {
-    await pool.query(`ALTER TABLE users MODIFY COLUMN password_hash VARCHAR(255) NOT NULL`);
-  }
-
   // Create users table (job seekers and providers)
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
@@ -49,6 +19,41 @@ async function ensureDatabase() {
       INDEX idx_users_email (email)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
   `);
+
+  // The `users` migrations below must stay AFTER the CREATE TABLE above: on a
+  // fresh database (a new RDS instance) the table does not exist yet, and an
+  // ALTER against a missing table aborts the whole boot sequence.
+
+  // Add FCM token column for push notifications (safe migration)
+  const [fcmColumnRows] = await pool.query(
+    `
+      SELECT COLUMN_NAME
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'users'
+        AND COLUMN_NAME = 'fcm_token'
+      LIMIT 1
+    `
+  );
+  if (!Array.isArray(fcmColumnRows) || fcmColumnRows.length === 0) {
+    await pool.query(`ALTER TABLE users ADD COLUMN fcm_token VARCHAR(255) DEFAULT NULL`);
+  }
+
+  // password_hash was CHAR(32) for md5; bcrypt reset hashes (~60 chars) were truncated in MySQL.
+  // Widen so md5 (32) or future bcrypt hashes fit.
+  const [pwdHashCol] = await pool.query(
+    `
+      SELECT CHARACTER_MAXIMUM_LENGTH AS maxlen
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'users'
+        AND COLUMN_NAME = 'password_hash'
+      LIMIT 1
+    `
+  );
+  if (Array.isArray(pwdHashCol) && pwdHashCol.length > 0 && Number(pwdHashCol[0].maxlen) < 255) {
+    await pool.query(`ALTER TABLE users MODIFY COLUMN password_hash VARCHAR(255) NOT NULL`);
+  }
 
   // Track notification delivery channel preference per user.
   const [fcmPlatformRows] = await pool.query(
@@ -972,68 +977,12 @@ async function ensureDatabase() {
       INDEX idx_digest_created (created_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
   `);
-  // Create razorpay_orders table
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS payments (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-   
-      -- Our own internal, unique order reference — generated before we ever
-      -- call Razorpay, sent as the "receipt" field. Used as the public-facing
-      -- ID for refund requests / invoice lookups instead of exposing
-      -- Razorpay's internal order id everywhere.
-      order_id VARCHAR(64) NOT NULL UNIQUE,
-   
-      razorpay_order_id VARCHAR(64) DEFAULT NULL,
-      razorpay_payment_id VARCHAR(64) DEFAULT NULL,
-      employer_id INT NOT NULL,
-      plan VARCHAR(50) NOT NULL,
-      amount_paise INT NOT NULL,
-      currency VARCHAR(10) NOT NULL DEFAULT 'INR',
-   
-      status ENUM('created', 'paid', 'failed', 'refunded') NOT NULL DEFAULT 'created',
-      verified_at TIMESTAMP NULL DEFAULT NULL,
-   
-      -- Set the moment a payment is confirmed. Kept separate from created_at
-      -- because refund eligibility ("within 3 days") is measured from the
-      -- actual payment moment, not order-creation time.
-      paid_at TIMESTAMP NULL DEFAULT NULL,
-   
-      -- Refund tracking
-      razorpay_refund_id VARCHAR(64) DEFAULT NULL,
-      refund_amount_paise INT DEFAULT NULL,
-      refund_reason VARCHAR(255) DEFAULT NULL,
-      refunded_at TIMESTAMP NULL DEFAULT NULL,
-   
-      -- Invoice/receipt tracking (generation logic to be added later —
-      -- these columns just record that it happened, and with what reference)
-      invoice_number VARCHAR(64) DEFAULT NULL UNIQUE,
-      invoice_generated_at TIMESTAMP NULL DEFAULT NULL,
-   
-      -- Email tracking (sending logic to be added later)
-      receipt_email_sent_at TIMESTAMP NULL DEFAULT NULL,
-   
-      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-   
-      INDEX idx_employer (employer_id),
-      INDEX idx_razorpay_order (razorpay_order_id),
-      INDEX idx_status (status),
-      INDEX idx_order_id (order_id)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-  `);
-   
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS payment_webhook_events (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      event_type VARCHAR(100) NOT NULL,
-      razorpay_payment_id VARCHAR(64) DEFAULT NULL,
-      razorpay_order_id VARCHAR(64) DEFAULT NULL,
-      raw_payload JSON NOT NULL,
-      processed BOOLEAN NOT NULL DEFAULT FALSE,
-      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      INDEX idx_payment_id (razorpay_payment_id)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-  `);
+  // Razorpay order/refund/invoice columns on `payments`, plus the webhook
+  // event log. Kept in its own module because the base `payments` table above
+  // predates the payment gateway and has to be migrated rather than replaced.
+  const { ensurePaymentSchema } = require('./paymentSchema');
+  await ensurePaymentSchema(pool);
+
   const { ensureCategorySchema } = require('./categorySchema');
   await ensureCategorySchema(pool);
 

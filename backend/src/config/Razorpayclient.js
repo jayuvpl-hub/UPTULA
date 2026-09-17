@@ -2,18 +2,15 @@
 // Import this everywhere instead of creating new Razorpay() instances elsewhere.
 
 const Razorpay = require('razorpay');
+const { RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, assertRazorpayConfig } = require('./env');
 
-if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
-  // Fail loudly at startup rather than silently misbehaving later.
-  throw new Error(
-    'Missing RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET in environment variables. ' +
-    'Check your .env file.'
-  );
-}
+// Throws in production, warns in development. Keeping the check here means a
+// misconfigured deploy fails at boot rather than at the first customer payment.
+assertRazorpayConfig();
 
 const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET,
+  key_id: RAZORPAY_KEY_ID,
+  key_secret: RAZORPAY_KEY_SECRET,
 });
 
 module.exports = razorpay;
