@@ -38,15 +38,37 @@ async function sendSms(phone, message) {
     throw err;
   }
 
-  const data = await res.json();
-  if (!data || data.status !== 'success') {
-    const err = new Error(`DropHello SMS rejected: ${data?.desc || data?.message || 'unknown error'}`);
+  const raw = await res.text();
+  let data;
+  try {
+    data = JSON.parse(raw);
+  } catch (_) {
+    const err = new Error(`DropHello SMS returned a non-JSON response: ${raw.slice(0, 120)}`);
     err.code = 'SMS_FAILED';
     throw err;
   }
 
+  if (!data || data.status !== 'success') {
+    const err = new Error(
+      `DropHello SMS rejected: ${data?.desc || data?.message || 'unknown error'}${data?.code ? ` (code ${data.code})` : ''}`
+    );
+    err.code = 'SMS_FAILED';
+    throw err;
+  }
+
+  // "success" with nothing submitted still means the handset gets no message.
+  if (data.totalnumbers_sbmited != null && Number(data.totalnumbers_sbmited) < 1) {
+    const err = new Error(`DropHello SMS accepted 0 numbers (code ${data.code || 'n/a'})`);
+    err.code = 'SMS_FAILED';
+    throw err;
+  }
+
+  // Submission only. DropHello exposes no delivery-report API, so a logid here
+  // does NOT prove the handset received it (DLT scrubbing can drop it later).
   if (!isProduction) {
-    console.log('[otp] SMS dispatched to channel=phone, logid=', data.logid);
+    console.log(
+      `[otp] SMS submitted to=${phone} code=${data.code} logid=${data.logid} campaign=${data.campg_id || 'n/a'} submitted=${data.totalnumbers_sbmited}`
+    );
   }
 }
 

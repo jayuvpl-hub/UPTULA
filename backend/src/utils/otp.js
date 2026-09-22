@@ -274,10 +274,11 @@ function mintCode() {
 function cooldownRemainingSeconds(expiresAt) {
   if (!expiresAt) return 0;
   const remaining = new Date(expiresAt).getTime() - Date.now();
-  if (remaining <= OTP_TTL_MS - SEND_COOLDOWN_MS) {
+  const cooldownEndsAfter = OTP_TTL_MS - SEND_COOLDOWN_MS;
+  if (remaining <= cooldownEndsAfter) {
     return 0;
   }
-  return Math.ceil(remaining / 1000);
+  return Math.ceil((remaining - cooldownEndsAfter) / 1000);
 }
 
 function logDev(msg) {
@@ -359,7 +360,11 @@ async function getOrCreateActiveOtp(purpose, email, fields = {}) {
     throw err;
   }
 
-  const rows = await query(`SELECT * FROM ${spec.table} WHERE email = ?`, [email]);
+  // Newest row wins: legacy databases may still hold duplicate rows per email.
+  const rows = await query(
+    `SELECT * FROM ${spec.table} WHERE email = ? ORDER BY id DESC LIMIT 1`,
+    [email]
+  );
   const existing = rows[0] || null;
 
   if (existing && Number(existing.resend_count) >= MAX_SENDS) {
@@ -381,8 +386,11 @@ async function getOrCreateActiveOtp(purpose, email, fields = {}) {
   // SEND FIRST. If this throws (SEND_FAILED / NO_CHANNEL), nothing is
   // written to the DB -- the caller's catch block handles the error and
   // the user's existing OTP state (if any) is left completely untouched.
+  // `email` is the normalized lookup key; deliver to the address as typed.
+  const deliveryEmail = fields.originalEmail || email;
+
   const sentVia = await dispatchOtp(purpose, {
-    email,
+    email: deliveryEmail,
     phone: fields.phone || null,
     fullName: fields.fullName || null,
     code: plaintextCode,
@@ -396,11 +404,12 @@ async function getOrCreateActiveOtp(purpose, email, fields = {}) {
   if (purpose === 'registration') {
     await query(
       `INSERT INTO register_otp (
-        email, otp_hash, full_name, role, phone, password_hash,
+        email, original_email, otp_hash, full_name, role, phone, password_hash,
         expires_at, attempt_count, resend_count, is_verified,
         category_id, subcategory_id, category_ids, subcategory_ids, experience
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 1, false, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 1, false, ?, ?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE
+        original_email = VALUES(original_email),
         otp_hash = VALUES(otp_hash),
         full_name = VALUES(full_name),
         role = VALUES(role),
@@ -417,6 +426,7 @@ async function getOrCreateActiveOtp(purpose, email, fields = {}) {
         experience = VALUES(experience)`,
       [
         email,
+        deliveryEmail,
         otpHash,
         fields.fullName || null,
         fields.role || null,
@@ -456,7 +466,11 @@ async function getOrCreateActiveOtp(purpose, email, fields = {}) {
 
 async function verifyOtp(purpose, email, submittedCode) {
   const spec = PURPOSE[purpose];
-  const rows = await query(`SELECT * FROM ${spec.table} WHERE email = ?`, [email]);
+  // Always check the most recent OTP, never a stale duplicate row.
+  const rows = await query(
+    `SELECT * FROM ${spec.table} WHERE email = ? ORDER BY id DESC LIMIT 1`,
+    [email]
+  );
   if (rows.length === 0) {
     const err = new Error('No OTP found');
     err.code = 'NOT_FOUND';

@@ -7,6 +7,21 @@ import RegistrationCategoryFields from "./RegistrationCategoryFields";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { auth as firebaseAuth, missingKeys as firebaseMissingKeys } from "../config/firebaseClient";
 
+// Send the address exactly as typed (only surrounding spaces removed) so it is
+// stored unmodified; the backend normalizes it internally for OTP lookups.
+function registrationEmailInput(email) {
+  return String(email || '').trim();
+}
+
+// Backend returns either { message } or express-validator's { errors: [{ msg }] }.
+function apiErrorMessage(data, fallback) {
+  return (
+    data?.message ||
+    (Array.isArray(data?.errors) && data.errors[0]?.msg) ||
+    fallback
+  );
+}
+
 function Footer() {
   // Track which registration type to show: 'seeker' or 'provider'
   const [registerType, setRegisterType] = useState('seeker');
@@ -259,7 +274,10 @@ function Footer() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleGoogleAuth = async (role, modalId) => {
+  // `mode` tells the backend whether an account may be created: the Register
+  // modals pass 'register', the Sign in modals pass 'login' and get an error
+  // when the Google email has no account yet.
+  const handleGoogleAuth = async (role, modalId, mode) => {
     setLoading(true);
     setMessage('');
 
@@ -277,7 +295,7 @@ function Footer() {
       const response = await fetch(`${API_BASE_URL}/api/auth/firebase`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: idToken, role })
+        body: JSON.stringify({ token: idToken, role, mode })
       });
 
       const data = await response.json();
@@ -326,10 +344,11 @@ function Footer() {
     }
 
     try {
+      const registrationEmail = registrationEmailInput(seekerForm.email);
       const payload = {
         role: 'seeker',
         fullName: seekerForm.fullName,
-        email: seekerForm.email,
+        email: registrationEmail,
         phone: seekerForm.phone,
         password: seekerForm.password,
         categoryId: Number(seekerForm.categoryId),
@@ -351,7 +370,7 @@ function Footer() {
       const data = await response.json();
 
       if (response.ok) {
-        setCurrentEmail(seekerForm.email);
+        setCurrentEmail(registrationEmail);
         setCurrentRole('seeker');
         setIsOtpStep(true);
         setOtpTimer(60);
@@ -384,10 +403,11 @@ function Footer() {
     }
 
     try {
+      const registrationEmail = registrationEmailInput(providerForm.email);
       const payload = {
         role: 'provider',
         fullName: providerForm.fullName,
-        email: providerForm.email,
+        email: registrationEmail,
         phone: providerForm.phone,
         password: providerForm.password,
       };
@@ -407,7 +427,7 @@ function Footer() {
       const data = await response.json();
 
       if (response.ok) {
-        setCurrentEmail(providerForm.email);
+        setCurrentEmail(registrationEmail);
         setCurrentRole('provider');
         setIsOtpStep(true);
         setOtpTimer(60);
@@ -539,7 +559,7 @@ function Footer() {
           setMessage('Registration completed but login failed. Please login manually.');
         }
       } else {
-        setMessage(data?.message || 'OTP verification failed');
+        setMessage(apiErrorMessage(data, 'OTP verification failed'));
       }
     } catch (error) {
       setMessage('Network error. Please try again.');
@@ -574,7 +594,7 @@ function Footer() {
         setOtpTimer(60);
         setMessage('OTP resent to your email');
       } else {
-        setMessage(data?.message || 'Failed to resend OTP');
+        setMessage(apiErrorMessage(data, 'Failed to resend OTP'));
       }
     } catch (error) {
       setMessage('Network error. Please try again.');
@@ -1257,7 +1277,7 @@ function Footer() {
                         href="#"
                         className="gplus-log-btn log-btn"
                         style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}
-                        onClick={e => { e.preventDefault(); handleGoogleAuth('seeker', 'signin'); }}
+                        onClick={e => { e.preventDefault(); handleGoogleAuth('seeker', 'signin', 'login'); }}
                       >
                        <img 
                         src="/assets/img/google.png" 
@@ -1286,7 +1306,7 @@ function Footer() {
                           gap: '8px',
                           textDecoration: 'none'
                         }}
-                        onClick={e => { e.preventDefault(); handleGoogleAuth('seeker', 'signin'); }}
+                        onClick={e => { e.preventDefault(); handleGoogleAuth('seeker', 'signin', 'login'); }}
                       >
                         <img
                           src="/assets/img/google.png"
@@ -1366,7 +1386,7 @@ function Footer() {
                       <a href="#"
                         className="gplus-log-btn log-btn"
                         style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}
-                        onClick={e => { e.preventDefault(); handleGoogleAuth('provider', 'signin'); }}><img src="/assets/img/google.png" alt="Google" style={{ width: '20px', height: '20px', marginRight: '8px', display: 'block', flexShrink: 0, verticalAlign: 'unset', marginBottom: '0px' }} /> Continue with Google</a>
+                        onClick={e => { e.preventDefault(); handleGoogleAuth('provider', 'signin', 'login'); }}><img src="/assets/img/google.png" alt="Google" style={{ width: '20px', height: '20px', marginRight: '8px', display: 'block', flexShrink: 0, verticalAlign: 'unset', marginBottom: '0px' }} /> Continue with Google</a>
                     </div>
                     <div className="footer-modal-switch-provider">
                       <span>To login as job seeker </span>
@@ -1434,7 +1454,7 @@ function Footer() {
                               href="#"
                               className="gplus-log-btn log-btn"
                               style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}
-                              onClick={e => { e.preventDefault(); handleGoogleAuth('seeker', 'register'); }}
+                              onClick={e => { e.preventDefault(); handleGoogleAuth('seeker', 'register', 'register'); }}
                             >
                               <img src="/assets/img/google.png" alt="Google" style={{ width: '20px', height: '20px', marginRight: '8px', display: 'block', flexShrink: 0, verticalAlign: 'unset', marginBottom: '0px' }} /> Continue with Google
                             </a>
@@ -1469,7 +1489,7 @@ function Footer() {
                               href="#"
                               className="gplus-log-btn log-btn"
                               style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}
-                              onClick={e => { e.preventDefault(); handleGoogleAuth('provider', 'register'); }}
+                              onClick={e => { e.preventDefault(); handleGoogleAuth('provider', 'register', 'register'); }}
                             >
                               <img src="/assets/img/google.png" alt="Google" style={{ width: '20px', height: '20px', marginRight: '8px', display: 'block', flexShrink: 0, verticalAlign: 'unset', marginBottom: '0px' }} /> Continue with Google
                             </a>

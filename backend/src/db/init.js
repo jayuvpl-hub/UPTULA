@@ -39,6 +39,39 @@ async function ensureDatabase() {
     await pool.query(`ALTER TABLE users ADD COLUMN fcm_token VARCHAR(255) DEFAULT NULL`);
   }
 
+  // How the account was created, plus the linked Google identity. Manual
+  // registration on a google-created account is refused; a Google sign-in on a
+  // local account links to it (Google has already verified the address).
+  const [authProviderRows] = await pool.query(
+    `
+      SELECT COLUMN_NAME
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'users'
+        AND COLUMN_NAME = 'auth_provider'
+      LIMIT 1
+    `
+  );
+  if (!Array.isArray(authProviderRows) || authProviderRows.length === 0) {
+    await pool.query(
+      `ALTER TABLE users ADD COLUMN auth_provider VARCHAR(20) NOT NULL DEFAULT 'local'`
+    );
+  }
+
+  const [firebaseUidRows] = await pool.query(
+    `
+      SELECT COLUMN_NAME
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'users'
+        AND COLUMN_NAME = 'firebase_uid'
+      LIMIT 1
+    `
+  );
+  if (!Array.isArray(firebaseUidRows) || firebaseUidRows.length === 0) {
+    await pool.query(`ALTER TABLE users ADD COLUMN firebase_uid VARCHAR(128) DEFAULT NULL`);
+  }
+
   // password_hash was CHAR(32) for md5; bcrypt reset hashes (~60 chars) were truncated in MySQL.
   // Widen so md5 (32) or future bcrypt hashes fit.
   const [pwdHashCol] = await pool.query(
@@ -919,6 +952,7 @@ async function ensureDatabase() {
     CREATE TABLE IF NOT EXISTS register_otp (
       id INT AUTO_INCREMENT PRIMARY KEY,
       email VARCHAR(255) NOT NULL,
+      original_email VARCHAR(255) NULL,
       otp_hash VARCHAR(255) NOT NULL,
       full_name VARCHAR(255),
       role VARCHAR(20),
@@ -931,6 +965,40 @@ async function ensureDatabase() {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
   `);
+
+  // `email` holds the normalized lookup key (dots/plus-tags stripped) so OTP
+  // upserts stay collision-free; `original_email` keeps the address exactly as
+  // the user typed it, and that is what lands in users.email on verification.
+  const [originalEmailCol] = await pool.query(
+    `SELECT COUNT(*) AS c FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'register_otp' AND COLUMN_NAME = 'original_email'`
+  );
+  if (!Number(originalEmailCol[0].c)) {
+    await pool.query(
+      'ALTER TABLE register_otp ADD COLUMN original_email VARCHAR(255) NULL AFTER email'
+    );
+  }
+
+  // OTP tables must hold one row per email: the OTP helper upserts with
+  // ON DUPLICATE KEY UPDATE, which silently appends duplicate rows when the
+  // unique key is missing, so verification then reads a stale/expired row.
+  for (const otpTable of ['password_resets', 'register_otp']) {
+    await pool.query(
+      `DELETE stale FROM ${otpTable} stale
+       JOIN (SELECT email, MAX(id) AS keep_id FROM ${otpTable} GROUP BY email) newest
+         ON stale.email = newest.email AND stale.id < newest.keep_id`
+    );
+    const [otpIndexRows] = await pool.query(
+      `SELECT COUNT(*) AS c FROM information_schema.STATISTICS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?`,
+      [otpTable, `uniq_${otpTable}_email`]
+    );
+    if (!Number(otpIndexRows[0].c)) {
+      await pool.query(
+        `ALTER TABLE ${otpTable} ADD UNIQUE KEY uniq_${otpTable}_email (email)`
+      );
+    }
+  }
 
   // Search / view logs and notification digest queue (smart job alerts)
   await pool.query(`

@@ -1,5 +1,6 @@
 const express = require('express');
 const { body } = require('express-validator');
+const normalizeEmailLib = require('validator/lib/normalizeEmail');
 const md5 = require('md5');
 const jwt = require('jsonwebtoken');
 const { query } = require('../db');
@@ -29,10 +30,51 @@ const parseIdArray = (val) => {
     : [];
 };
 
+/**
+ * OTP rows are keyed by the normalized email (dots/plus-tags stripped) so that
+ * register/resend/verify agree no matter which form the client sends. The
+ * address the user actually typed is kept separately and is what gets stored.
+ */
+const registrationEmailKey = (email) => {
+  const raw = String(email || '').trim();
+  if (!raw) return '';
+  return normalizeEmailLib(raw) || raw.toLowerCase();
+};
+
+/**
+ * One inbox = one account. Matches a stored user by the address as typed or by
+ * its normalized form, so Gmail dot/plus variants (Google's `jay.uvpl@` vs a
+ * hand-typed `jayuvpl@`) can never produce two accounts for the same person.
+ */
+const findAccountByEmail = async (rawEmail) => {
+  const typed = String(rawEmail || '').trim();
+  if (!typed) return null;
+  const key = registrationEmailKey(typed);
+  const rows = await query(
+    `SELECT * FROM users
+      WHERE email = ?
+         OR email = ?
+         OR (
+           SUBSTRING_INDEX(LOWER(email), '@', -1) IN ('gmail.com', 'googlemail.com')
+           AND CONCAT(
+                 REPLACE(SUBSTRING_INDEX(SUBSTRING_INDEX(LOWER(email), '@', 1), '+', 1), '.', ''),
+                 '@gmail.com'
+               ) = ?
+         )
+      ORDER BY id ASC
+      LIMIT 1`,
+    [typed, key, key]
+  );
+  return rows[0] || null;
+};
+
+const GOOGLE_ACCOUNT_MESSAGE =
+  'This email is already registered with Google. Please continue with Google sign-in.';
+
 const registrationValidation = [
   body('role').isIn(['seeker', 'provider']).withMessage('role must be seeker or provider'),
   body('fullName').trim().isLength({ min: 2 }).withMessage('fullName is required'),
-  body('email').isEmail().normalizeEmail().withMessage('valid email required'),
+  body('email').trim().isEmail().withMessage('valid email required'),
   body('phone').optional({ values: 'falsy' }).isMobilePhone().withMessage('valid phone required'),
   body('password').isLength({ min: 6 }).withMessage('password min 6 chars'),
   body('experience').optional().isIn(['fresher', 'experience']).withMessage('invalid experience'),
@@ -46,9 +88,12 @@ const registrationValidation = [
 // Full path (mounted in app.js): POST /api/auth/firebase
 router.post('/firebase', async (req, res, next) => {
   try {
-    const { token, role } = req.body;
+    const { token, role, mode } = req.body;
 
     const finalRole = role === 'provider' ? 'provider' : 'seeker';
+    // Only the Register screens may create an account. Older clients that send
+    // no mode keep the previous create-on-demand behaviour.
+    const isLoginOnly = mode === 'login';
 
     // 1. Verify Firebase token
     const decoded = await admin.auth().verifyIdToken(token);
@@ -61,22 +106,30 @@ router.post('/firebase', async (req, res, next) => {
 
     const googleName = name || 'Google User';
 
-    // 2. Check DB
-    let users = await query('SELECT * FROM users WHERE email = ?', [email]);
+    // 2. Check DB (matches Gmail dot/plus variants of the same inbox too)
+    const existing = await findAccountByEmail(email);
 
     let user;
 
-    if (users.length === 0) {
+    if (!existing) {
+      if (isLoginOnly) {
+        return res.status(404).json({
+          message: 'No account found for this Google email. Please register first.',
+        });
+      }
+
       // 3. Register user
       const result = await query(
-        `INSERT INTO users (role, full_name, email, password_hash) VALUES (?, ?, ?, ?)`,
+        `INSERT INTO users (role, full_name, email, password_hash, auth_provider, firebase_uid)
+         VALUES (?, ?, ?, ?, 'google', ?)`,
         [
           finalRole,
           googleName,
           email,
           // DB schema requires password_hash NOT NULL.
           // For Google users we store a deterministic "dummy" hash so normal password login won't work.
-          md5(uid || email)
+          md5(uid || email),
+          uid || null
         ]
       );
 
@@ -87,13 +140,14 @@ router.post('/firebase', async (req, res, next) => {
         full_name: googleName
       };
     } else {
-      user = users[0];
+      user = existing;
 
-      // Ensure role matches the role requested by the frontend.
-      // (Helps when the same Google email is used for provider vs seeker.)
-      if (user.role !== finalRole) {
-        await query('UPDATE users SET role = ? WHERE id = ?', [finalRole, user.id]);
-        user.role = finalRole;
+      // Google has verified this address, so signing in links it to the account
+      // that already owns the inbox. The stored role is left alone: the button
+      // the user happened to click must not convert a seeker into a provider.
+      if (!user.firebase_uid && uid) {
+        await query('UPDATE users SET firebase_uid = ? WHERE id = ?', [uid, user.id]);
+        user.firebase_uid = uid;
       }
     }
 
@@ -175,9 +229,14 @@ router.post('/internal/create-user', async (req, res) => {
       return res.status(400).json({ message: 'valid email required' });
     }
 
-    const existingUser = await query('SELECT id FROM users WHERE email = ?', [trimmedEmail]);
-    if (existingUser.length > 0) {
-      return res.status(400).json({ message: 'Email already registered' });
+    const existingUser = await findAccountByEmail(trimmedEmail);
+    if (existingUser) {
+      return res.status(400).json({
+        message:
+          existingUser.auth_provider === 'google'
+            ? GOOGLE_ACCOUNT_MESSAGE
+            : 'Email already registered',
+      });
     }
 
     let primaryCategoryId = null;
@@ -264,7 +323,7 @@ router.post('/register', registrationValidation, async (req, res) => {
     const {
       role,
       fullName,
-      email,
+      email: originalEmail,
       phone: rawPhone,
       password,
       experience,
@@ -274,6 +333,8 @@ router.post('/register', registrationValidation, async (req, res) => {
       subcategoryIds,
     } = req.body;
     const phone = String(rawPhone || '').trim() || null;
+    // Store the address exactly as typed; key the OTP row by its normalized form.
+    const email = registrationEmailKey(originalEmail);
 
     // Multi-select (new flow) takes precedence; otherwise fall back to the
     // legacy single category/subcategory pair so older clients keep working.
@@ -307,9 +368,16 @@ router.post('/register', registrationValidation, async (req, res) => {
     const expVal =
       experience === 'fresher' || experience === 'experience' ? experience : null;
 
-    const existingUser = await query('SELECT id FROM users WHERE email = ?', [email]);
-    if (existingUser.length > 0) {
-      return res.status(400).json({ message: 'Email already registered' });
+    // A password form cannot prove ownership of a Google-verified address, so
+    // those accounts are sent back to Google sign-in instead of registering.
+    const existingUser = await findAccountByEmail(originalEmail);
+    if (existingUser) {
+      return res.status(400).json({
+        message:
+          existingUser.auth_provider === 'google'
+            ? GOOGLE_ACCOUNT_MESSAGE
+            : 'Email already registered',
+      });
     }
 
     const passwordHash = await hashPassword(password);
@@ -317,6 +385,7 @@ router.post('/register', registrationValidation, async (req, res) => {
     let otpResult;
     try {
       otpResult = await getOrCreateActiveOtp('registration', email, {
+        originalEmail,
         fullName,
         role,
         phone,
@@ -354,9 +423,12 @@ router.post('/register', registrationValidation, async (req, res) => {
 // resend otp for register-initiate
 router.post('/resend-register-otp', async (req, res) => {
   try {
-    const { email } = req.body;
+    const email = registrationEmailKey(req.body.email);
 
-    const rows = await query('SELECT * FROM register_otp WHERE email = ?', [email]);
+    const rows = await query(
+      'SELECT * FROM register_otp WHERE email = ? ORDER BY id DESC LIMIT 1',
+      [email]
+    );
 
     if (rows.length === 0) {
       return res.status(400).json({ message: 'No registration request found' });
@@ -367,6 +439,7 @@ router.post('/resend-register-otp', async (req, res) => {
     let otpResult;
     try {
       otpResult = await getOrCreateActiveOtp('registration', email, {
+        originalEmail: record.original_email || record.email,
         fullName: record.full_name,
         role: record.role,
         phone: record.phone,
@@ -404,7 +477,8 @@ router.post('/resend-register-otp', async (req, res) => {
 // verify otp for register-initiate
 router.post('/verify-register-otp', async (req, res) => {
   try {
-    const { email, otp } = req.body;
+    const { otp } = req.body;
+    const email = registrationEmailKey(req.body.email);
 
     let record;
     try {
@@ -413,9 +487,17 @@ router.post('/verify-register-otp', async (req, res) => {
       return res.status(otpHttpStatus(otpErr)).json({ message: otpErr.message });
     }
 
-    const existingUser = await query('SELECT id FROM users WHERE email = ?', [record.email || email]);
-    if (existingUser.length > 0) {
-      return res.status(400).json({ message: 'Email already registered' });
+    // Persist the address exactly as the user typed it on the register step.
+    const storedEmail = record.original_email || record.email || email;
+
+    const existingUser = await findAccountByEmail(storedEmail);
+    if (existingUser) {
+      return res.status(400).json({
+        message:
+          existingUser.auth_provider === 'google'
+            ? GOOGLE_ACCOUNT_MESSAGE
+            : 'Email already registered',
+      });
     }
 
     const result = await query(
@@ -424,7 +506,7 @@ router.post('/verify-register-otp', async (req, res) => {
       [
         record.role,
         record.full_name,
-        record.email,
+        storedEmail,
         record.phone,
         record.password_hash,
         record.category_id || record.registration_category_id || null,
@@ -450,7 +532,7 @@ router.post('/verify-register-otp', async (req, res) => {
       await query(
         `INSERT INTO employer_profiles (user_id, company_name, contact_person, company_email)
          VALUES (?, ?, ?, ?)`,
-        [newUserId, record.full_name, record.full_name, record.email]
+        [newUserId, record.full_name, record.full_name, storedEmail]
       );
     }
 
@@ -459,7 +541,7 @@ router.post('/verify-register-otp', async (req, res) => {
 
     // Send welcome email
     const successHtml = registrationSuccessTemplate(record.full_name);
-    await sendEmail(record.email, 'Welcome to Uptula!', successHtml);
+    await sendEmail(storedEmail, 'Welcome to Uptula!', successHtml);
 
     return res.json({ message: 'Registration successful' });
 
@@ -679,7 +761,7 @@ router.post('/reset-password', async (req, res) => {
     }
 
     const rows = await query(
-      'SELECT * FROM password_resets WHERE email = ? AND is_verified = true',
+      'SELECT * FROM password_resets WHERE email = ? AND is_verified = true ORDER BY id DESC LIMIT 1',
       [email]
     );
 
@@ -711,7 +793,10 @@ router.post('/resend-otp', async (req, res) => {
   try {
     const { email } = req.body;
 
-    const rows = await query('SELECT * FROM password_resets WHERE email = ?', [email]);
+    const rows = await query(
+      'SELECT * FROM password_resets WHERE email = ? ORDER BY id DESC LIMIT 1',
+      [email]
+    );
 
     if (rows.length === 0) {
       return res.status(400).json({ message: 'No request found' });

@@ -807,18 +807,10 @@ import { API_BASE_URL } from "../config/api";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { auth as firebaseAuth, missingKeys as firebaseMissingKeys } from "../config/firebaseClient";
 
-// Match express-validator normalizeEmail() so verify/resend use the same key stored on register.
-function normalizeRegistrationEmail(email) {
-  const trimmed = String(email || "").trim();
-  if (!trimmed) return "";
-  const parts = trimmed.toLowerCase().split("@");
-  if (parts.length !== 2) return trimmed.toLowerCase();
-  let [local, domain] = parts;
-  if (domain === "googlemail.com") domain = "gmail.com";
-  if (domain === "gmail.com") {
-    local = local.split("+")[0].replace(/\./g, "");
-  }
-  return `${local}@${domain}`;
+// Send the address exactly as typed (only surrounding spaces removed) so it is
+// stored unmodified; the backend normalizes it internally for OTP lookups.
+function registrationEmailInput(email) {
+  return String(email || "").trim();
 }
 
 function RegisterPage() {
@@ -956,7 +948,7 @@ function RegisterPage() {
       const response = await fetch(`${API_BASE_URL}/api/auth/firebase`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: idToken, role }),
+        body: JSON.stringify({ token: idToken, role, mode: "register" }),
       });
       const data = await response.json();
       if (response.ok) {
@@ -994,7 +986,7 @@ function RegisterPage() {
       const response = await fetch(`${API_BASE_URL}/api/auth/firebase`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: idToken, role }),
+        body: JSON.stringify({ token: idToken, role, mode: "login" }),
       });
       const data = await response.json();
       if (response.ok) {
@@ -1030,7 +1022,7 @@ function RegisterPage() {
       return;
     }
     try {
-      const registrationEmail = normalizeRegistrationEmail(seekerForm.email);
+      const registrationEmail = registrationEmailInput(seekerForm.email);
       const payload = {
         role: "seeker",
         fullName: seekerForm.fullName,
@@ -1106,7 +1098,7 @@ function RegisterPage() {
     setLoading(true);
     setMessage("");
 
-    const verifyEmail = normalizeRegistrationEmail(currentEmail || seekerForm.email);
+    const verifyEmail = registrationEmailInput(currentEmail || seekerForm.email);
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/auth/verify-register-otp`, {
@@ -1168,7 +1160,7 @@ function RegisterPage() {
     setLoading(true);
     setMessage("");
 
-    const resendEmail = normalizeRegistrationEmail(currentEmail || seekerForm.email);
+    const resendEmail = registrationEmailInput(currentEmail || seekerForm.email);
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/auth/resend-register-otp`, {
