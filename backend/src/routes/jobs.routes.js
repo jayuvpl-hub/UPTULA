@@ -93,8 +93,8 @@ router.get('/jobs/latest', async (req, res, next) => {
       LEFT JOIN employer_profiles ep ON ep.user_id = j.employer_id
       WHERE j.status = 'active'
       ORDER BY j.created_at DESC
-      LIMIT ?
-    `, [safeLimit]);
+      LIMIT ${safeLimit}
+    `, []);
 
     const mapped = jobs.map(j => {
       // Construct location string from city, state, country
@@ -970,8 +970,8 @@ router.get('/track/search', authenticate, async (req, res, next) => {
        WHERE user_id = ?
          AND searched_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
        ORDER BY searched_at DESC
-       LIMIT ?`,
-      [userId, limit]
+       LLIMIT ${limit}`,
+      [userId]
     );
  
     return res.json({ searches: rows });
@@ -1049,8 +1049,8 @@ router.get('/track/job-views', authenticate, async (req, res, next) => {
        WHERE ujv.user_id = ?
          AND ujv.viewed_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
        ORDER BY ujv.viewed_at DESC
-       LIMIT ?`,
-      [userId, limit]
+       LIMIT ${limit}`,
+      [userId]
     );
  
     return res.json({

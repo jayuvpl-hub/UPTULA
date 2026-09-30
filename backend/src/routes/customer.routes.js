@@ -56,7 +56,9 @@ router.get('/verify', authenticate, authenticateCustomer, (req, res) => {
 // Payments listing with employer contact details
 router.get('/payments', authenticate, authenticateCustomer, async (req, res, next) => {
 	try {
-		const { page = 1, limit = 20, status, type, q } = req.query;
+		const { status, type, q } = req.query;
+		const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+		const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
 		const offset = (page - 1) * limit;
 
 		let whereClause = '';
@@ -97,9 +99,9 @@ router.get('/payments', authenticate, authenticateCustomer, async (req, res, nex
       JOIN users u ON u.id = p.user_id
       ${whereClause}
       ORDER BY p.created_at DESC
-      LIMIT ? OFFSET ?
+      LIMIT ${limit} OFFSET ${offset}
     `,
-			[...params, parseInt(limit), parseInt(offset)]
+			params
 		);
 
 		const totalCount = await query(
@@ -129,7 +131,9 @@ router.get('/payments', authenticate, authenticateCustomer, async (req, res, nex
 // Employer lookup and account details
 router.get('/employers', authenticate, authenticateCustomer, async (req, res, next) => {
 	try {
-		const { q = '', page = 1, limit = 20 } = req.query;
+		const { q = '' } = req.query;
+		const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+		const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
 		const offset = (page - 1) * limit;
 		const like = `%${q}%`;
 		const rows = await query(
@@ -138,9 +142,9 @@ router.get('/employers', authenticate, authenticateCustomer, async (req, res, ne
       FROM users
       WHERE role = 'provider' AND (full_name LIKE ? OR email LIKE ? OR phone LIKE ?)
       ORDER BY created_at DESC
-      LIMIT ? OFFSET ?
+      LIMIT ${limit} OFFSET ${offset}
     `,
-			[like, like, like, parseInt(limit), parseInt(offset)]
+			[like, like, like]
 		);
 		const count = await query(
 			`SELECT COUNT(*) as count FROM users WHERE role = 'provider' AND (full_name LIKE ? OR email LIKE ? OR phone LIKE ?)`,
@@ -245,7 +249,9 @@ async function ensureTicketsTable() {
 router.get('/tickets', authenticate, authenticateCustomer, async (req, res, next) => {
 	try {
 		await ensureTicketsTable();
-		const { page = 1, limit = 20, status, category, q, employerId } = req.query;
+		const { status, category, q, employerId } = req.query;
+		const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+		const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
 		const offset = (page - 1) * limit;
 		const params = [];
 		const conditions = [];
@@ -263,8 +269,8 @@ router.get('/tickets', authenticate, authenticateCustomer, async (req, res, next
        JOIN users u ON u.id = t.employer_id
        ${whereClause}
        ORDER BY t.updated_at DESC
-       LIMIT ? OFFSET ?`,
-			[...params, parseInt(limit), parseInt(offset)]
+       LIMIT ${limit} OFFSET ${offset}`,
+			params
 		);
 		const count = await query(
 			`SELECT COUNT(*) as count FROM support_tickets t ${whereClause}`,

@@ -685,7 +685,9 @@ router.get('/jobs', authenticate, async (req, res, next) => {
     }
 
     const employerId = req.user.id;
-    const { page = 1, limit = 10, status = 'active' } = req.query;
+    const { status = 'active' } = req.query;
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
     const offset = (page - 1) * limit;
 
     // Get jobs with pagination
@@ -701,8 +703,8 @@ router.get('/jobs', authenticate, async (req, res, next) => {
       LEFT JOIN employer_profiles ep ON ep.user_id = j.employer_id
       WHERE j.employer_id = ? AND j.status = ?
       ORDER BY j.created_at DESC
-      LIMIT ? OFFSET ?
-    `, [employerId, status, parseInt(limit), parseInt(offset)]);
+      LIMIT ${limit} OFFSET ${offset}
+    `, [employerId, status]);
 
     // Get total count
     const countResult = await query(
@@ -1026,7 +1028,9 @@ router.get('/tickets', authenticate, async (req, res, next) => {
       return res.status(403).json({ message: 'Access denied. Employers only.' });
     }
     const employerId = req.user.id;
-    const { page = 1, limit = 20, status, category, q } = req.query;
+    const { status, category, q } = req.query;
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
     const offset = (page - 1) * limit;
     const params = [employerId];
     const conditions = ['t.employer_id = ?'];
@@ -1039,8 +1043,8 @@ router.get('/tickets', authenticate, async (req, res, next) => {
        FROM support_tickets t
        ${whereClause}
        ORDER BY t.updated_at DESC
-       LIMIT ? OFFSET ?`,
-      [...params, parseInt(limit), parseInt(offset)]
+         LIMIT ${limit} OFFSET ${offset}`,
+        params
     );
     const count = await query(
       `SELECT COUNT(*) as count FROM support_tickets t ${whereClause}`,

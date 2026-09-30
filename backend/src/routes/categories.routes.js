@@ -89,8 +89,8 @@ router.get('/admin/categories', authenticate, authenticateAdmin, async (req, res
   try {
     const q = String(req.query.q || '').trim();
     const status = req.query.status || '';
-    const page = Math.max(1, Number(req.query.page) || 1);
-    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 50));
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 50));
     const offset = (page - 1) * limit;
     const like = `%${q}%`;
 
@@ -110,8 +110,8 @@ router.get('/admin/categories', authenticate, authenticateAdmin, async (req, res
               (SELECT COUNT(*) FROM users u WHERE u.category_id = c.id) AS user_count
        FROM categories c ${where}
        ORDER BY c.sort_order ASC, c.name ASC
-       LIMIT ? OFFSET ?`,
-      [...params, limit, offset]
+         LIMIT ${limit} OFFSET ${offset}`,
+        params
     );
 
     const [totalRow] = await query(`SELECT COUNT(*) AS count FROM categories c ${where}`, params);
@@ -256,8 +256,8 @@ router.get('/admin/subcategories', authenticate, authenticateAdmin, async (req, 
     const q = String(req.query.q || '').trim();
     const categoryId = req.query.categoryId ? Number(req.query.categoryId) : null;
     const status = req.query.status || '';
-    const page = Math.max(1, Number(req.query.page) || 1);
-    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 50));
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 50));
     const offset = (page - 1) * limit;
     const like = `%${q}%`;
 
@@ -283,8 +283,8 @@ router.get('/admin/subcategories', authenticate, authenticateAdmin, async (req, 
        INNER JOIN categories c ON c.id = s.category_id
        ${where}
        ORDER BY c.sort_order, s.sort_order, s.name
-       LIMIT ? OFFSET ?`,
-      [...params, limit, offset]
+         LIMIT ${limit} OFFSET ${offset}`,
+        params
     );
     const [totalRow] = await query(
       `SELECT COUNT(*) AS count FROM subcategories s ${where}`,

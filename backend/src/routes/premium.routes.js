@@ -354,7 +354,8 @@ router.get('/download-history', authenticate, async (req, res, next) => {
     }
 
     const employerId = req.user.id;
-    const { page = 1, limit = 20 } = req.query;
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
     const offset = (page - 1) * limit;
 
     const downloads = await query(`
@@ -371,8 +372,8 @@ router.get('/download-history', authenticate, async (req, res, next) => {
       JOIN jobs j ON j.id = a.job_id
       WHERE dt.employer_id = ?
       ORDER BY dt.created_at DESC
-      LIMIT ? OFFSET ?
-    `, [employerId, parseInt(limit), parseInt(offset)]);
+      LIMIT ${limit} OFFSET ${offset}
+    `, [employerId]);
 
     const totalCount = await query(`
       SELECT COUNT(*) as count

@@ -513,8 +513,8 @@ router.get('/notifications/:userId', authenticate, async (req, res, next) => {
     const pool = getPool();
 
     // ✅ Pagination params
-    const limit = Number(req.query.limit) || 20;
-    const offset = Number(req.query.offset) || 0;
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const offset = Math.min(1000000, Math.max(0, parseInt(req.query.offset, 10) || 0));
 
     const [rows] = await pool.execute(
       `
@@ -522,9 +522,9 @@ router.get('/notifications/:userId', authenticate, async (req, res, next) => {
         FROM notifications
         WHERE user_id = ?
         ORDER BY created_at DESC
-        LIMIT ? OFFSET ?
+        LIMIT ${limit} OFFSET ${offset}
       `,
-      [requestedUserId, limit, offset]
+      [requestedUserId]
     );
 
     res.json({
