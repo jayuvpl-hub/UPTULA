@@ -272,8 +272,24 @@ router.get('/jobs', async (req, res, next) => {
       LEFT JOIN employer_profiles ep ON ep.user_id = j.employer_id
       ${whereClause}
       ORDER BY j.created_at DESC
-      LIMIT ? OFFSET ?
-    `, [...values, safeLimit, offset]);
+      LIMIT ${safeLimit} OFFSET ${offset}
+    `, values);
+    // const jobs = await query(`
+    //   SELECT 
+    //     j.id, j.employer_id, j.job_title, j.company_name, j.category, j.description, j.salary_range,
+    //     j.salary_min, j.salary_max, j.salary_type,
+    //     j.no_of_vacancy, j.experience, j.company_logo, ep.logo_url AS employer_logo_url,
+    //     j.job_type, j.qualification, j.skills,
+    //     j.email, j.phone, j.website, j.address, j.city, j.state, j.country, j.zip_code,
+    //     j.facebook, j.google, j.twitter, j.linkedin, j.pinterest, j.instagram,
+    //     j.status, j.is_featured, j.views_count, j.applications_count,
+    //     j.created_at, j.updated_at
+    //   FROM jobs j
+    //   LEFT JOIN employer_profiles ep ON ep.user_id = j.employer_id
+    //   ${whereClause}
+    //   ORDER BY j.created_at DESC
+    //   LIMIT ? OFFSET ?
+    // `, [...values, safeLimit, offset]);
 
     // Map to camelCase-friendly fields for frontend
     const mapped = jobs.map(j => ({
