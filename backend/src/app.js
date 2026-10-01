@@ -32,8 +32,32 @@ const fs = require('fs');
 const app = express();
 
 app.set('trust proxy', 1);
-app.use(helmet());
 app.use(morgan('dev'));
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      useDefaults: true,
+      directives: {
+        "script-src": ["'self'", "https://apis.google.com"],
+        "frame-src": [
+          "'self'",
+          "https://accounts.google.com",
+          "https://uptula-d1894.firebaseapp.com",
+        ],
+        "connect-src": [
+          "'self'",
+          "https://identitytoolkit.googleapis.com",
+          "https://securetoken.googleapis.com",
+          "https://www.googleapis.com",
+          "https://apis.google.com",
+        ],
+        "img-src": ["'self'", "data:", "https://*.googleusercontent.com"],
+      },
+    },
+    // Helmet's default "same-origin" breaks Google popup sign-in
+    crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
+  })
+);
 
 // Razorpay webhooks need the unparsed body to verify their signature, so this
 // must be mounted ahead of express.json().
