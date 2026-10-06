@@ -51,7 +51,7 @@ app.use(
           "https://www.googleapis.com",
           "https://apis.google.com",
         ],
-        "img-src": ["'self'", "data:", "https://*.googleusercontent.com"],
+       "img-src": ["'self'", "data:", "blob:", "https://*.googleusercontent.com"],
       },
     },
     // Helmet's default "same-origin" breaks Google popup sign-in
