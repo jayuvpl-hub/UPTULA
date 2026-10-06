@@ -1,4 +1,3 @@
-// Ensure .env is loaded even on hosts that run app.js directly (e.g. cPanel/Passenger)
 require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
 
 const express = require('express');
@@ -51,7 +50,7 @@ app.use(
           "https://www.googleapis.com",
           "https://apis.google.com",
         ],
-       "img-src": ["'self'", "data:", "blob:", "https://*.googleusercontent.com"],
+        "img-src":  ["'self'", "data:", "blob:", "https://*.googleusercontent.com", "https://uptula-app-storage.s3.ap-south-1.amazonaws.com"], 
       },
     },
     // Helmet's default "same-origin" breaks Google popup sign-in
