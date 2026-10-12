@@ -16,6 +16,11 @@ const { applyUserContactUpdate } = require('../utils/email');
 
 const router = express.Router();
 
+const s3PublicUrl = (key) =>
+  key && key.startsWith('profiles/')
+    ? `https://${S3_BUCKET}.s3.${AWS_REGION}.amazonaws.com/${key}`
+    : key || '';
+
 /**
  * Compute a simple profile-completion percentage (0-100) for a candidate.
  * Weighted across the fields that matter most for searchability.
@@ -96,7 +101,7 @@ function buildCandidateProfileResponse(user, profile = {}, selectedCategories = 
     google: profile.google || '',
     preferredJobRole: profile.preferred_job_role || '',
     bio: profile.bio || '',
-    resume: profile.resume || '',
+    resume: s3PublicUrl(profile.resume) || '',
     resumeName: profile.resume_name || '',
     resumeSize: profile.resume_size || null,
     resumeUploadedAt: profile.resume_uploaded_at || null,
@@ -109,7 +114,7 @@ function buildCandidateProfileResponse(user, profile = {}, selectedCategories = 
     noticePeriod: profile.notice_period || '',
     preferredLocation: profile.preferred_location || '',
     employmentType: profile.employment_type || '',
-    profilePicture: profile.profile_picture || '',
+    profilePicture: s3PublicUrl(profile.profile_picture) || '',
     preferredLanguage: user.preferred_language || 'en',
     profileCompletion: typeof user.profile_completion === 'number' ? user.profile_completion : 0,
     resumeStatus: user.resume_status || 'none',
@@ -359,6 +364,7 @@ const upload = multer({
   storage: multerS3({
     s3,
     bucket: S3_BUCKET,
+    contentType: multerS3.AUTO_CONTENT_TYPE,
     key: (req, file, cb) => {
       const isResume = file.fieldname === 'resume';
       const folder = isResume ? 'resumes' : 'profiles';
@@ -865,7 +871,7 @@ async function updateCandidateProfile(req, res, next) {
       const responseData = {
         message: 'Profile updated successfully',
         profileCompletion,
-        profilePicture: finalProfilePicture || null,
+        profilePicture: s3PublicUrl(finalProfilePicture) || null,
         profile: buildCandidateProfileResponse(
           freshUser,
           freshProfile || {},

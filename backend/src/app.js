@@ -50,7 +50,13 @@ app.use(
           "https://www.googleapis.com",
           "https://apis.google.com",
         ],
-        "img-src":  ["'self'", "data:", "blob:", "https://*.googleusercontent.com", "https://uptula-app-storage.s3.ap-south-1.amazonaws.com"], 
+        "img-src": [
+          "'self'",
+          "data:",
+          "blob:",
+          "https://uptula-app-storage.s3.ap-south-1.amazonaws.com",
+          "https://*.googleusercontent.com",
+        ],
       },
     },
     // Helmet's default "same-origin" breaks Google popup sign-in
@@ -108,11 +114,11 @@ app.get('/redirect', (req, res) => {
 
 // Static files for uploads (UPLOADS_ROOT env for production paths outside app dir)
 const uploadsRoot = UPLOADS_ROOT;
-try { fs.mkdirSync(path.join(uploadsRoot, 'jobs'), { recursive: true }); } catch (_) {}
-try { fs.mkdirSync(path.join(uploadsRoot, 'applications'), { recursive: true }); } catch (_) {}
-try { fs.mkdirSync(path.join(uploadsRoot, 'profiles'), { recursive: true }); } catch (_) {}
-try { fs.mkdirSync(path.join(uploadsRoot, 'resumes'), { recursive: true }); } catch (_) {}
-try { fs.mkdirSync(path.join(uploadsRoot, 'companies'), { recursive: true }); } catch (_) {}
+try { fs.mkdirSync(path.join(uploadsRoot, 'jobs'), { recursive: true }); } catch (_) { }
+try { fs.mkdirSync(path.join(uploadsRoot, 'applications'), { recursive: true }); } catch (_) { }
+try { fs.mkdirSync(path.join(uploadsRoot, 'profiles'), { recursive: true }); } catch (_) { }
+try { fs.mkdirSync(path.join(uploadsRoot, 'resumes'), { recursive: true }); } catch (_) { }
+try { fs.mkdirSync(path.join(uploadsRoot, 'companies'), { recursive: true }); } catch (_) { }
 app.use('/uploads', express.static(uploadsRoot));
 
 app.get('/api/health', (req, res) => {
@@ -145,7 +151,7 @@ if (fs.existsSync(frontendBuildPath)) {
   console.log('Frontend build directory found. Setting up SPA routes.');
   // Serve static files (CSS, JS, images, etc.) from the build directory
   // In `public_html` index.html sits at the root and static assets are under /static.
-  app.use(express.static(frontendBuildPath, { 
+  app.use(express.static(frontendBuildPath, {
     index: false, // Don't serve index.html automatically for root
     fallthrough: true // Continue to next middleware if file not found
   }));
@@ -234,7 +240,7 @@ if (fs.existsSync(frontendBuildPath)) {
     if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || req.path === '/redirect') {
       return next();
     }
-    
+
     const indexPath = path.join(frontendBuildPath, 'index.html');
     if (fs.existsSync(indexPath)) {
       console.log('Serving SPA route:', req.path, '-> index.html (from', frontendBuildPath + ')');
@@ -272,7 +278,7 @@ if (enableFrontendCheck) {
         path.join(frontendBuildPath || '', 'static', 'js')
       ];
       const assetsExist = {};
-      for (const p of sampleAssets) assetsExist[p.replace((frontendBuildPath||''),'') || p] = fs.existsSync(p);
+      for (const p of sampleAssets) assetsExist[p.replace((frontendBuildPath || ''), '') || p] = fs.existsSync(p);
       return res.json({
         ok: true,
         frontendBuildPath: frontendBuildPath || null,
