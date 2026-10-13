@@ -37,11 +37,28 @@ app.use(
     contentSecurityPolicy: {
       useDefaults: true,
       directives: {
-        "script-src": ["'self'", "https://apis.google.com"],
+        "script-src": [
+          "'self'",
+          "https://apis.google.com",
+          "https://www.googletagmanager.com",
+          "https://translate.google.com",
+          "https://translate.googleapis.com",
+          "https://www.gstatic.com",
+          "https://checkout.razorpay.com",
+          // the 5 inline scripts reported in your console (hashes come from the errors)
+          "'sha256-TNSm+/DEXh9w/Fo33Wz84A65g+Y3Px9oixyZj1/Ec/Y='",
+          "'sha256-mkZV8gJBe6MHB7zo2GK5fxiDyLMWG9GHdUXVXq42Q18='",
+          "'sha256-5y+4YquVY7gYnT64S3D3msmVlZ86kOmsULfJ9p7UH+E='",
+          "'sha256-2oLUq7BDBiuK7Zcmkxn5uwM5PDYsQmg6e0zXf4/og8I='",
+          "'sha256-1bOzKaAmWYJurDW82qpT3993yU2pFTjK2a/Vb0WN3hc='",
+        ],
         "frame-src": [
           "'self'",
           "https://accounts.google.com",
           "https://uptula-d1894.firebaseapp.com",
+          "https://translate.google.com",
+          "https://api.razorpay.com",
+          "https://checkout.razorpay.com",
         ],
         "connect-src": [
           "'self'",
@@ -49,6 +66,13 @@ app.use(
           "https://securetoken.googleapis.com",
           "https://www.googleapis.com",
           "https://apis.google.com",
+          "https://translate.googleapis.com",
+          "https://www.googletagmanager.com",
+          "https://www.google-analytics.com",
+          "https://*.google-analytics.com",
+          "https://*.analytics.google.com",
+          "https://api.razorpay.com",
+          "https://lumberjack.razorpay.com",
         ],
         "img-src": [
           "'self'",
@@ -56,10 +80,14 @@ app.use(
           "blob:",
           "https://uptula-app-storage.s3.ap-south-1.amazonaws.com",
           "https://*.googleusercontent.com",
+          "https://www.gstatic.com",
+          "https://www.google.com",
+          "https://www.google-analytics.com",
+          "https://www.googletagmanager.com",
+          "https://translate.googleapis.com",
         ],
       },
     },
-    // Helmet's default "same-origin" breaks Google popup sign-in
     crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
   })
 );
