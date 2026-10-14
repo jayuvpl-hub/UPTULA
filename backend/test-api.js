@@ -17,7 +17,8 @@ async function testAPI() {
       },
       body: JSON.stringify({
         email: 'deepu1@test.com',
-        password: 'password123' // You might need to check the actual password
+        password: 'password123', // You might need to check the actual password
+        role: 'provider'
       })
     });
     

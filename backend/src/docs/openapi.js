@@ -47,7 +47,12 @@ const openapiSpec = {
     },
     '/api/auth/login': {
       post: { summary: 'Login (email or phone). Legacy md5 hashes auto-upgrade to bcrypt.',
-        responses: { 200: { description: 'JWT + user' }, 401: { description: 'Bad credentials' }, 403: { description: 'Suspended' } } },
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['email', 'password', 'role'], properties: {
+          email: { type: 'string', description: 'Email address or phone number' },
+          password: { type: 'string' },
+          role: { type: 'string', enum: ['seeker', 'provider'] },
+        } } } } },
+        responses: { 200: { description: 'JWT + user' }, 400: { description: 'Invalid role or request' }, 401: { description: 'Bad credentials' }, 403: { description: 'Role mismatch or suspended account' } } },
     },
 
     '/api/categories/categories': {

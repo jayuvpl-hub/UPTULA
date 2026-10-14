@@ -142,6 +142,12 @@ router.post('/firebase', async (req, res, next) => {
     } else {
       user = existing;
 
+      if (isLoginOnly && user.role !== finalRole) {
+        return res.status(403).json({
+          message: `This account is registered as a ${user.role === 'provider' ? 'employer' : 'candidate'}. Please use the matching login.`,
+        });
+      }
+
       // Google has verified this address, so signing in links it to the account
       // that already owns the inbox. The stored role is left alone: the button
       // the user happened to click must not convert a seeker into a provider.
@@ -554,7 +560,11 @@ router.post('/verify-register-otp', async (req, res) => {
 // Login
 router.post(
   '/login',
-  [body('email').trim().notEmpty().withMessage('Email or phone is required'), body('password').isLength({ min: 1 })],
+  [
+    body('email').trim().notEmpty().withMessage('Email or phone is required'),
+    body('password').isLength({ min: 1 }),
+    body('role').isIn(['seeker', 'provider']).withMessage('role must be seeker or provider'),
+  ],
   async (req, res, next) => {
     try {
       const { validationResult } = require('express-validator');
@@ -601,6 +611,12 @@ router.post(
           return res.status(401).json({ message: 'Incorrect Password' });
         }
         user = userRows[0];
+      }
+
+      if (user.role !== req.body.role) {
+        return res.status(403).json({
+          message: `This account is registered as a ${user.role === 'provider' ? 'employer' : 'candidate'}. Please use the matching login.`,
+        });
       }
 
       // Block suspended accounts (best-effort; column added by boot migration).

@@ -1119,6 +1119,7 @@ function RegisterPage() {
           body: JSON.stringify({
             email: verifyEmail,
             password: seekerForm.password,
+            role: "seeker",
           }),
         });
 
@@ -1234,6 +1235,7 @@ function RegisterPage() {
         body: JSON.stringify({
           email: seekerLogin.email,
           password: seekerLogin.password,
+          role: "seeker",
         }),
       });
 
@@ -1265,6 +1267,7 @@ function RegisterPage() {
         body: JSON.stringify({
           email: providerLogin.email,
           password: providerLogin.password,
+          role: "provider",
         }),
       });
 

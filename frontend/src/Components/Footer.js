@@ -509,7 +509,8 @@ function Footer() {
           },
           body: JSON.stringify({
             email: currentEmail,
-            password: currentRole === 'seeker' ? seekerForm.password : providerForm.password
+            password: currentRole === 'seeker' ? seekerForm.password : providerForm.password,
+            role: currentRole
           })
         });
 
@@ -624,7 +625,8 @@ function Footer() {
         },
         body: JSON.stringify({
           email: seekerLogin.email,
-          password: seekerLogin.password
+          password: seekerLogin.password,
+          role: 'seeker'
         })
       });
 
@@ -666,7 +668,8 @@ function Footer() {
         },
         body: JSON.stringify({
           email: providerLogin.email,
-          password: providerLogin.password
+          password: providerLogin.password,
+          role: 'provider'
         })
       });
 
