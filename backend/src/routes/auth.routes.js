@@ -1,10 +1,9 @@
 const express = require('express');
 const { body } = require('express-validator');
 const normalizeEmailLib = require('validator/lib/normalizeEmail');
-const md5 = require('md5');
 const jwt = require('jsonwebtoken');
 const { query } = require('../db');
-const { JWT_SECRET, JWT_EXPIRES_IN } = require('../config/env');
+const { JWT_SECRET, JWT_EXPIRES_IN, INTERNAL_API_KEY } = require('../config/env');
 const { authenticate } = require('../middleware/auth');
 const admin = require('../config/firebase');
 const bcrypt = require('bcryptjs');
@@ -68,8 +67,80 @@ const findAccountByEmail = async (rawEmail) => {
   return rows[0] || null;
 };
 
+/** Same digit-stripping lookup used by phone login. */
+const findAccountByPhone = async (rawPhone) => {
+  const identifier = String(rawPhone || '').trim();
+  if (!identifier) return null;
+  let rows = await query('SELECT * FROM users WHERE phone = ? LIMIT 1', [identifier]);
+  if (rows.length === 0) {
+    const digits = identifier.replace(/\D/g, '');
+    if (digits) {
+      rows = await query(
+        `SELECT * FROM users
+         WHERE REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '+', ''), '(', '') = ?
+         LIMIT 1`,
+        [digits]
+      );
+    }
+  }
+  return rows[0] || null;
+};
+
 const GOOGLE_ACCOUNT_MESSAGE =
   'This email is already registered with Google. Please continue with Google sign-in.';
+
+const REFERRAL_CODE_MAX_LEN = 32;
+
+function parseReferralCode(raw) {
+  if (typeof raw !== 'string') return { ok: true, value: null };
+  const trimmed = raw.trim();
+  if (!trimmed) return { ok: true, value: null };
+  if (trimmed.length > REFERRAL_CODE_MAX_LEN) return { ok: false };
+  return { ok: true, value: trimmed };
+}
+
+function normalizeSentVia(sentVia) {
+  const channels = Array.isArray(sentVia) ? sentVia : sentVia ? [sentVia] : [];
+  const hasEmail = channels.includes('email');
+  const hasSms = channels.includes('sms');
+  if (hasEmail && hasSms) return 'both';
+  if (hasSms) return 'sms';
+  return 'email';
+}
+
+async function applyReferralOnRegistration(userId, referralCode) {
+  if (!referralCode || !userId) return;
+  try {
+    const owners = await query(
+      `SELECT employer_id FROM employer_referral_codes WHERE referral_code = ? LIMIT 1`,
+      [referralCode]
+    );
+    if (owners.length === 0) return;
+    const employerId = owners[0].employer_id;
+    if (Number(employerId) === Number(userId)) return;
+
+    const pending = await query(
+      `SELECT id FROM referrals
+       WHERE employer_id = ? AND referral_code = ? AND referred_user_id IS NULL
+       ORDER BY id DESC LIMIT 1`,
+      [employerId, referralCode]
+    );
+    if (pending.length > 0) {
+      await query(
+        `UPDATE referrals SET referred_user_id = ?, status = 'registered' WHERE id = ?`,
+        [userId, pending[0].id]
+      );
+    } else {
+      await query(
+        `INSERT INTO referrals (employer_id, referral_code, referred_user_id, status)
+         VALUES (?, ?, ?, 'registered')`,
+        [employerId, referralCode, userId]
+      );
+    }
+  } catch (err) {
+    console.warn('Failed to apply referral on registration:', err.message);
+  }
+}
 
 const registrationValidation = [
   body('role').isIn(['seeker', 'provider']).withMessage('role must be seeker or provider'),
@@ -96,12 +167,21 @@ router.post('/firebase', async (req, res, next) => {
     const isLoginOnly = mode === 'login';
 
     // 1. Verify Firebase token
-    const decoded = await admin.auth().verifyIdToken(token);
+    let decoded;
+    try {
+      decoded = await admin.auth().verifyIdToken(token);
+    } catch (err) {
+      return res.status(401).json({ message: 'Firebase auth failed' });
+    }
+
+    if (decoded.email_verified !== true || decoded.firebase?.sign_in_provider !== 'google.com') {
+      return res.status(401).json({ message: 'Firebase auth failed' });
+    }
 
     const { email, name, uid } = decoded;
 
     if (!email) {
-      return res.status(400).json({ message: 'Invalid Firebase user' });
+      return res.status(401).json({ message: 'Firebase auth failed' });
     }
 
     const googleName = name || 'Google User';
@@ -127,8 +207,7 @@ router.post('/firebase', async (req, res, next) => {
           googleName,
           email,
           // DB schema requires password_hash NOT NULL.
-          // For Google users we store a deterministic "dummy" hash so normal password login won't work.
-          md5(uid || email),
+          await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10),
           uid || null
         ]
       );
@@ -141,6 +220,13 @@ router.post('/firebase', async (req, res, next) => {
       };
     } else {
       user = existing;
+
+      try {
+        const [statusRow] = await query('SELECT account_status FROM users WHERE id = ?', [user.id]);
+        if (statusRow && statusRow.account_status === 'suspended') {
+          return res.status(403).json({ message: 'Your account has been suspended. Please contact support.' });
+        }
+      } catch (_) { /* column may not exist yet */ }
 
       if (isLoginOnly && user.role !== finalRole) {
         return res.status(403).json({
@@ -156,6 +242,10 @@ router.post('/firebase', async (req, res, next) => {
         user.firebase_uid = uid;
       }
     }
+
+    try {
+      await query('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?', [user.id]);
+    } catch (_) { /* non-blocking */ }
 
     // 5. If provider, ensure employer profile exists.
     if (user.role === 'provider') {
@@ -209,13 +299,22 @@ router.post('/firebase', async (req, res, next) => {
 
   } catch (err) {
     console.error(err);
-    return res.status(401).json({ message: 'Firebase auth failed' });
+    return res.status(500).json({ message: 'Server error' });
   }
 });
 
 // INTERNAL USER CREATION (NO OTP)
 router.post('/internal/create-user', async (req, res) => {
   try {
+    const providedKey = req.get('x-internal-api-key') || '';
+    if (
+      !INTERNAL_API_KEY ||
+      Buffer.byteLength(providedKey) !== Buffer.byteLength(INTERNAL_API_KEY) ||
+      !crypto.timingSafeEqual(Buffer.from(providedKey), Buffer.from(INTERNAL_API_KEY))
+    ) {
+      return res.status(403).json({ message: 'Forbidden' });
+    }
+
     const { role, fullName, email, phone, password, categoryId, subcategoryId, categoryIds, subcategoryIds, experience } = req.body;
     const trimmedFullName = String(fullName || '').trim();
     const trimmedEmail = String(email || '').trim().toLowerCase();
@@ -337,10 +436,24 @@ router.post('/register', registrationValidation, async (req, res) => {
       subcategoryId,
       categoryIds,
       subcategoryIds,
+      referralCode: rawReferralCode,
     } = req.body;
     const phone = String(rawPhone || '').trim() || null;
     // Store the address exactly as typed; key the OTP row by its normalized form.
     const email = registrationEmailKey(originalEmail);
+
+    const parsedReferral = parseReferralCode(rawReferralCode);
+    if (!parsedReferral.ok) {
+      return res.status(400).json({ message: 'Invalid referral code' });
+    }
+    const referralCode = parsedReferral.value;
+
+    if (phone) {
+      const existingPhone = await findAccountByPhone(phone);
+      if (existingPhone) {
+        return res.status(400).json({ message: 'Phone number already registered' });
+      }
+    }
 
     // Multi-select (new flow) takes precedence; otherwise fall back to the
     // legacy single category/subcategory pair so older clients keep working.
@@ -418,7 +531,18 @@ router.post('/register', registrationValidation, async (req, res) => {
       });
     }
 
-    return res.json({ message: 'OTP sent', sentVia: otpResult.sentVia });
+    if (referralCode) {
+      try {
+        await query(
+          'UPDATE register_otp SET referral_code = ? WHERE email = ?',
+          [referralCode, email]
+        );
+      } catch (refErr) {
+        console.warn('Failed to persist referral code on registration:', refErr.message);
+      }
+    }
+
+    return res.json({ message: 'OTP sent', sentVia: normalizeSentVia(otpResult.sentVia) });
 
   } catch (err) {
     console.error(err);
@@ -472,7 +596,7 @@ router.post('/resend-register-otp', async (req, res) => {
       });
     }
 
-    return res.json({ message: 'OTP resent successfully', sentVia: otpResult.sentVia });
+    return res.json({ message: 'OTP resent successfully', sentVia: normalizeSentVia(otpResult.sentVia) });
 
   } catch (err) {
     console.error(err);
@@ -542,12 +666,18 @@ router.post('/verify-register-otp', async (req, res) => {
       );
     }
 
+    await applyReferralOnRegistration(newUserId, record.referral_code);
+
     // delete after success
     await query('DELETE FROM register_otp WHERE email = ?', [email]);
 
     // Send welcome email
-    const successHtml = registrationSuccessTemplate(record.full_name);
-    await sendEmail(storedEmail, 'Welcome to Uptula!', successHtml);
+    try {
+      const successHtml = registrationSuccessTemplate(record.full_name);
+      await sendEmail(storedEmail, 'Welcome to Uptula!', successHtml);
+    } catch (emailErr) {
+      console.warn('Failed to send registration welcome email:', emailErr.message);
+    }
 
     return res.json({ message: 'Registration successful' });
 
@@ -578,39 +708,31 @@ router.post(
       let user;
       if (isEmailLogin) {
         const userRows = await query(
-          'SELECT id, role, full_name, email, password_hash FROM users WHERE email = ? LIMIT 1',
+          'SELECT id, role, full_name, email, password_hash, auth_provider FROM users WHERE email = ? LIMIT 1',
           [identifier.toLowerCase()]
         );
         if (userRows.length === 0) {
           return res.status(401).json({ message: 'User not found' });
+        }
+        if (userRows[0].auth_provider === 'google') {
+          return res.status(400).json({ message: GOOGLE_ACCOUNT_MESSAGE });
         }
         if (!(await verifyPassword(password, userRows[0].password_hash))) {
           return res.status(401).json({ message: 'Incorrect Password' });
         }
         user = userRows[0];
       } else {
-        let userRows = await query(
-          'SELECT id, role, full_name, email, password_hash FROM users WHERE phone = ? LIMIT 1',
-          [identifier]
-        );
-        if (userRows.length === 0) {
-          const digits = identifier.replace(/\D/g, '');
-          if (digits) {
-            userRows = await query(
-              `SELECT id, role, full_name, email, password_hash FROM users
-               WHERE REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '+', ''), '(', '') = ?
-               LIMIT 1`,
-              [digits]
-            );
-          }
-        }
-        if (userRows.length === 0) {
+        const phoneAccount = await findAccountByPhone(identifier);
+        if (!phoneAccount) {
           return res.status(401).json({ message: 'User not found' });
         }
-        if (!(await verifyPassword(password, userRows[0].password_hash))) {
+        if (phoneAccount.auth_provider === 'google') {
+          return res.status(400).json({ message: GOOGLE_ACCOUNT_MESSAGE });
+        }
+        if (!(await verifyPassword(password, phoneAccount.password_hash))) {
           return res.status(401).json({ message: 'Incorrect Password' });
         }
-        user = userRows[0];
+        user = phoneAccount;
       }
 
       if (user.role !== req.body.role) {
@@ -706,18 +828,18 @@ router.put('/change-password', authenticate, async (req, res, next) => {
 router.post('/forgot-password', async (req, res) => {
   try {
     const { email } = req.body;
+    const account = await findAccountByEmail(email);
+    const genericMessage = 'If this email is registered, an OTP has been sent';
 
-    const user = await query('SELECT id, full_name, phone FROM users WHERE email = ?', [email]);
-
-    if (user.length === 0) {
-      return res.status(400).json({ message: 'Enter your registered email' });
+    if (!account) {
+      return res.json({ message: genericMessage });
     }
 
     let otpResult;
     try {
-      otpResult = await getOrCreateActiveOtp('password_reset', email, {
-        phone: user[0].phone,
-        fullName: user[0].full_name,
+      otpResult = await getOrCreateActiveOtp('password_reset', account.email, {
+        phone: account.phone,
+        fullName: account.full_name,
       });
     } catch (otpErr) {
       if (otpErr.code === 'MAX_SENDS') {
@@ -735,7 +857,7 @@ router.post('/forgot-password', async (req, res) => {
       });
     }
 
-    return res.json({ message: 'OTP sent successfully', sentVia: otpResult.sentVia });
+    return res.json({ message: genericMessage, sentVia: normalizeSentVia(otpResult.sentVia) });
 
   } catch (err) {
     console.error(err);
@@ -747,16 +869,20 @@ router.post('/forgot-password', async (req, res) => {
 router.post('/verify-otp', async (req, res) => {
   try {
     const { email, otp } = req.body;
+    const account = await findAccountByEmail(email);
+    if (!account) {
+      return res.json({ message: 'If this email is registered, an OTP has been sent' });
+    }
 
     try {
-      await verifyOtp('password_reset', email, otp);
+      await verifyOtp('password_reset', account.email, otp);
     } catch (otpErr) {
       return res.status(otpHttpStatus(otpErr)).json({ message: otpErr.message });
     }
 
     await query(
       'UPDATE password_resets SET is_verified = true WHERE email = ?',
-      [email]
+      [account.email]
     );
 
     return res.json({ message: 'OTP verified' });
@@ -771,6 +897,10 @@ router.post('/verify-otp', async (req, res) => {
 router.post('/reset-password', async (req, res) => {
   try {
     const { email, newPassword, confirmPassword } = req.body;
+    const account = await findAccountByEmail(email);
+    if (!account) {
+      return res.json({ message: 'If this email is registered, an OTP has been sent' });
+    }
 
     if (newPassword !== confirmPassword) {
       return res.status(400).json({ message: 'Passwords do not match' });
@@ -778,7 +908,7 @@ router.post('/reset-password', async (req, res) => {
 
     const rows = await query(
       'SELECT * FROM password_resets WHERE email = ? AND is_verified = true ORDER BY id DESC LIMIT 1',
-      [email]
+      [account.email]
     );
 
     if (rows.length === 0) {
@@ -790,11 +920,11 @@ router.post('/reset-password', async (req, res) => {
 
     await query(
       'UPDATE users SET password_hash = ? WHERE email = ?',
-      [passwordHash, email]
+      [passwordHash, account.email]
     );
 
     // delete OTP after success
-    await query('DELETE FROM password_resets WHERE email = ?', [email]);
+    await query('DELETE FROM password_resets WHERE email = ?', [account.email]);
 
     return res.json({ message: 'Password reset successful' });
 
@@ -808,23 +938,25 @@ router.post('/reset-password', async (req, res) => {
 router.post('/resend-otp', async (req, res) => {
   try {
     const { email } = req.body;
+    const account = await findAccountByEmail(email);
+    if (!account) {
+      return res.json({ message: 'If this email is registered, an OTP has been sent' });
+    }
 
     const rows = await query(
       'SELECT * FROM password_resets WHERE email = ? ORDER BY id DESC LIMIT 1',
-      [email]
+      [account.email]
     );
 
     if (rows.length === 0) {
-      return res.status(400).json({ message: 'No request found' });
+      return res.json({ message: 'If this email is registered, an OTP has been sent' });
     }
-
-    const user = await query('SELECT full_name, phone FROM users WHERE email = ?', [email]);
 
     let otpResult;
     try {
-      otpResult = await getOrCreateActiveOtp('password_reset', email, {
-        phone: user[0] && user[0].phone,
-        fullName: user[0] && user[0].full_name,
+      otpResult = await getOrCreateActiveOtp('password_reset', account.email, {
+        phone: account.phone,
+        fullName: account.full_name,
       });
     } catch (otpErr) {
       if (otpErr.code === 'MAX_SENDS') {
@@ -842,7 +974,7 @@ router.post('/resend-otp', async (req, res) => {
       });
     }
 
-    return res.json({ message: 'OTP resent', sentVia: otpResult.sentVia });
+    return res.json({ message: 'OTP resent', sentVia: normalizeSentVia(otpResult.sentVia) });
 
   } catch (err) {
     console.error(err);

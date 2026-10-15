@@ -34,6 +34,7 @@ const PUBLIC_API_URL = (
 
 const JWT_SECRET = process.env.JWT_SECRET || 'development_secret_change_me';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
+const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY || '';
 
 // --- Local-disk uploads (cPanel era) ---
 // KEEP THESE until every multer config is confirmed working against S3 AND
@@ -141,6 +142,7 @@ module.exports = {
   PUBLIC_API_URL,
   JWT_SECRET,
   JWT_EXPIRES_IN,
+  INTERNAL_API_KEY,
   UPLOADS_ROOT,
   uploadPath,
   uploadPathFromUrl,

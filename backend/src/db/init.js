@@ -979,6 +979,18 @@ async function ensureDatabase() {
     );
   }
 
+  // Carry employer referral codes through OTP so verify-register-otp can
+  // mark referrals.registered / referred_user_id (existing referrals schema).
+  const [otpReferralCol] = await pool.query(
+    `SELECT COUNT(*) AS c FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'register_otp' AND COLUMN_NAME = 'referral_code'`
+  );
+  if (!Number(otpReferralCol[0].c)) {
+    await pool.query(
+      'ALTER TABLE register_otp ADD COLUMN referral_code VARCHAR(32) NULL'
+    );
+  }
+
   // OTP tables must hold one row per email: the OTP helper upserts with
   // ON DUPLICATE KEY UPDATE, which silently appends duplicate rows when the
   // unique key is missing, so verification then reads a stale/expired row.

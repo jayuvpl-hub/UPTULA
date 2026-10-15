@@ -22,6 +22,18 @@ function apiErrorMessage(data, fallback) {
   );
 }
 
+function otpDeliveryTarget(sentVia) {
+  let via = sentVia;
+  if (Array.isArray(sentVia)) {
+    const hasEmail = sentVia.includes('email');
+    const hasSms = sentVia.includes('sms');
+    via = hasEmail && hasSms ? 'both' : hasSms ? 'sms' : 'email';
+  }
+  if (via === 'sms') return 'your phone';
+  if (via === 'both') return 'your email and phone';
+  return 'your email';
+}
+
 function Footer() {
   // Track which registration type to show: 'seeker' or 'provider'
   const [registerType, setRegisterType] = useState('seeker');
@@ -54,6 +66,8 @@ function Footer() {
   const [isOtpStep, setIsOtpStep] = useState(false);
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [otpTimer, setOtpTimer] = useState(60);
+  const [otpExpired, setOtpExpired] = useState(false);
+  const [otpSentVia, setOtpSentVia] = useState('email');
   const [resendCount, setResendCount] = useState(0);
   const [currentEmail, setCurrentEmail] = useState('');
   const [currentRole, setCurrentRole] = useState('');
@@ -103,7 +117,9 @@ function Footer() {
     return (
       t.includes('success') ||
       t.includes('otp sent') ||
-      t.includes('otp resent')
+      t.includes('otp resent') ||
+      t.includes('verified') ||
+      (t.includes('otp') && t.includes('sent'))
     );
   };
 
@@ -131,6 +147,8 @@ function Footer() {
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotOtp, setForgotOtp] = useState(['', '', '', '', '', '']);
   const [forgotOtpTimer, setForgotOtpTimer] = useState(60);
+  const [forgotOtpExpired, setForgotOtpExpired] = useState(false);
+  const [forgotOtpSentVia, setForgotOtpSentVia] = useState('email');
   const [forgotResendCount, setForgotResendCount] = useState(0);
   const [forgotNewPassword, setForgotNewPassword] = useState('');
   const [forgotConfirmPassword, setForgotConfirmPassword] = useState('');
@@ -167,6 +185,7 @@ function Footer() {
     setForgotEmail('');
     setForgotOtp(['', '', '', '', '', '']);
     setForgotOtpTimer(60);
+    setForgotOtpExpired(false);
     setForgotResendCount(0);
     setForgotNewPassword('');
     setForgotConfirmPassword('');
@@ -179,6 +198,7 @@ function Footer() {
     setIsOtpStep(false);
     setOtp(['', '', '', '', '', '']);
     setOtpTimer(60);
+    setOtpExpired(false);
     setResendCount(0);
     setMessage('');
   }, []);
@@ -191,6 +211,7 @@ function Footer() {
     setForgotEmail('');
     setForgotOtp(['', '', '', '', '', '']);
     setForgotOtpTimer(60);
+    setForgotOtpExpired(false);
     setForgotResendCount(0);
     setForgotNewPassword('');
     setForgotConfirmPassword('');
@@ -374,8 +395,10 @@ function Footer() {
         setCurrentRole('seeker');
         setIsOtpStep(true);
         setOtpTimer(60);
+        setOtpExpired(false);
+        setOtpSentVia(data.sentVia || 'email');
         setResendCount(0);
-        setMessage('OTP sent to your email');
+        setMessage(`OTP sent to ${otpDeliveryTarget(data.sentVia)}`);
       } else {
         setMessage(data?.message || 'Registration failed');
       }
@@ -431,8 +454,10 @@ function Footer() {
         setCurrentRole('provider');
         setIsOtpStep(true);
         setOtpTimer(60);
+        setOtpExpired(false);
+        setOtpSentVia(data.sentVia || 'email');
         setResendCount(0);
-        setMessage('OTP sent to your email');
+        setMessage(`OTP sent to ${otpDeliveryTarget(data.sentVia)}`);
       } else {
         setMessage(data?.message || 'Registration failed');
       }
@@ -536,17 +561,22 @@ function Footer() {
             email: '',
             phone: '',
             password: '',
-            confirmPassword: ''
+            confirmPassword: '',
+            categoryId: '',
+            subcategoryId: ''
           });
           setProviderForm({
             fullName: '',
             email: '',
             phone: '',
             password: '',
-            confirmPassword: ''
+            confirmPassword: '',
+            categoryId: '',
+            subcategoryId: ''
           });
           setIsOtpStep(false);
           setOtp(['', '', '', '', '', '']);
+          setOtpExpired(false);
 
           // Navigate
           if (currentRole === 'provider') {
@@ -560,7 +590,9 @@ function Footer() {
           setMessage('Registration completed but login failed. Please login manually.');
         }
       } else {
-        setMessage(apiErrorMessage(data, 'OTP verification failed'));
+        const errorMessage = apiErrorMessage(data, 'OTP verification failed');
+        setOtpExpired(String(errorMessage).toLowerCase().includes('expired'));
+        setMessage(errorMessage);
       }
     } catch (error) {
       setMessage('Network error. Please try again.');
@@ -593,7 +625,9 @@ function Footer() {
       if (response.ok) {
         setResendCount(prev => prev + 1);
         setOtpTimer(60);
-        setMessage('OTP resent to your email');
+        setOtpExpired(false);
+        setOtpSentVia(data.sentVia || otpSentVia);
+        setMessage(`OTP resent to ${otpDeliveryTarget(data.sentVia || otpSentVia)}`);
       } else {
         setMessage(apiErrorMessage(data, 'Failed to resend OTP'));
       }
@@ -607,6 +641,7 @@ function Footer() {
     setIsOtpStep(false);
     setOtp(['', '', '', '', '', '']);
     setOtpTimer(60);
+    setOtpExpired(false);
     setResendCount(0);
     setMessage('');
   };
@@ -720,8 +755,10 @@ function Footer() {
       if (response.ok) {
         setForgotStep(2);
         setForgotOtpTimer(60);
+        setForgotOtpExpired(false);
+        setForgotOtpSentVia(data.sentVia || 'email');
         setForgotResendCount(0);
-        setForgotMessage('OTP sent to your email');
+        setForgotMessage(data.message || `OTP sent to ${otpDeliveryTarget(data.sentVia)}`);
       } else {
         setForgotMessage(data?.message || 'Failed to send OTP');
       }
@@ -787,7 +824,9 @@ function Footer() {
         setForgotStep(3);
         setForgotMessage('OTP verified successfully');
       } else {
-        setForgotMessage(data?.message || 'OTP verification failed');
+        const errorMessage = data?.message || 'OTP verification failed';
+        setForgotOtpExpired(String(errorMessage).toLowerCase().includes('expired'));
+        setForgotMessage(errorMessage);
       }
     } catch (error) {
       setForgotMessage('Network error. Please try again.');
@@ -816,7 +855,9 @@ function Footer() {
       if (response.ok) {
         setForgotResendCount(prev => prev + 1);
         setForgotOtpTimer(60);
-        setForgotMessage('OTP resent to your email');
+        setForgotOtpExpired(false);
+        setForgotOtpSentVia(data.sentVia || forgotOtpSentVia);
+        setForgotMessage(`OTP resent to ${otpDeliveryTarget(data.sentVia || forgotOtpSentVia)}`);
       } else {
         setForgotMessage(data?.message || 'Failed to resend OTP');
       }
@@ -1031,223 +1072,78 @@ function Footer() {
                   {forgotModalOpen && (
                     <div id="forgot-inline-panel" style={{ display: 'block' }}>
                       <h2 className="footer-modal-heading" style={{ textAlign: 'center' }}>Forgot Password</h2>
-
                       {forgotMessage && (
-                        <div className={`alert ${forgotMessage.includes('success') ? 'alert-success' : 'alert-danger'}`} style={{ marginBottom: '15px' }}>
+                        <div className={`alert ${isFooterSuccessMessage(forgotMessage) ? 'alert-success' : 'alert-danger'}`} style={{ marginBottom: '15px' }}>
                           {forgotMessage}
                         </div>
                       )}
-
                       {forgotStep === 1 && (
-                        <div>
+                        <div className="footer-modal-form">
                           <p style={{ marginBottom: '20px', textAlign: 'center' }}>Enter your email address to reset your password</p>
-                          <input
-                            type="email"
-                            placeholder="Email Address"
-                            value={forgotEmail}
-                            onChange={e => setForgotEmail(e.target.value)}
-                            style={{
-                              width: '100%',
-                              padding: '12px',
-                              border: '1px solid #ddd',
-                              borderRadius: '5px',
-                              marginBottom: '15px',
-                              fontSize: '16px'
-                            }}
-                            required
-                          />
-                          <button
-                            type="button"
-                            onClick={handleForgotSendOTP}
-                            disabled={forgotLoading}
-                            style={{
-                              width: '100%',
-                              padding: '12px',
-                              backgroundColor: '#007bff',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '5px',
-                              fontSize: '16px',
-                              cursor: forgotLoading ? 'not-allowed' : 'pointer'
-                            }}
-                          >
+                          <input type="email" placeholder="Email Address" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} required />
+                          <button type="button" className="footer-modal-submit" onClick={handleForgotSendOTP} disabled={forgotLoading}>
                             {forgotLoading ? 'Sending...' : 'Send OTP'}
                           </button>
                         </div>
                       )}
-
                       {forgotStep === 2 && (
-                        <div>
-                          <p style={{ marginBottom: '20px', textAlign: 'center' }}>Enter the 6-digit OTP sent to your email</p>
+                        <div className="footer-modal-form">
+                          <p style={{ marginBottom: '20px', textAlign: 'center' }}>Enter the 6-digit OTP sent to {otpDeliveryTarget(forgotOtpSentVia)}</p>
                           <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '20px' }}>
                             {forgotOtp.map((digit, index) => (
-                              <input
-                                key={index}
-                                id={`forgot-otp-${index}`}
-                                type="text"
-                                value={digit}
-                                onChange={(e) => handleForgotOtpChange(index, e.target.value.replace(/\D/g, ''))}
-                                onKeyDown={(e) => handleForgotOtpKeyDown(index, e)}
-                                onPaste={handleForgotOtpPaste}
-                                maxLength="1"
-                                style={{
-                                  width: '40px',
-                                  height: '40px',
-                                  textAlign: 'center',
-                                  border: '1.5px solid #e5e7eb',
-                                  borderRadius: '7px',
-                                  fontSize: '18px',
-                                  background: '#f8fafc',
-                                  outline: 'none',
-                                  transition: 'border-color 0.2s'
-                                }}
-                                autoFocus={index === 0}
-                              />
+                              <input key={index} id={`forgot-otp-${index}`} type="text" value={digit}
+                                onChange={e => handleForgotOtpChange(index, e.target.value.replace(/\D/g, ''))}
+                                onKeyDown={e => handleForgotOtpKeyDown(index, e)} onPaste={handleForgotOtpPaste} maxLength="1" autoFocus={index === 0}
+                                style={{ width: '40px', height: '40px', textAlign: 'center', border: '1.5px solid #e5e7eb', borderRadius: '7px', fontSize: '18px', background: '#f8fafc' }} />
                             ))}
                           </div>
                           <div style={{ textAlign: 'center', marginBottom: '15px' }}>
-                            {forgotOtpTimer > 0 ? (
-                              <span>Resend OTP in {forgotOtpTimer}s</span>
-                            ) : (
-                              <span style={{ color: 'red' }}>OTP expired</span>
-                            )}
+                            {forgotOtpTimer > 0 ? <span>Resend OTP in {forgotOtpTimer}s</span> : forgotOtpExpired ? <span style={{ color: 'red' }}>OTP expired</span> : <span>Resend OTP available</span>}
                           </div>
-                          <button
-                            type="button"
-                            onClick={handleForgotVerifyOtp}
-                            disabled={forgotLoading || forgotOtp.some(d => !d)}
-                            style={{
-                              width: '100%',
-                              padding: '12px',
-                              backgroundColor: '#28a745',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '5px',
-                              fontSize: '16px',
-                              marginBottom: '10px',
-                              cursor: forgotLoading || forgotOtp.some(d => !d) ? 'not-allowed' : 'pointer'
-                            }}
-                          >
+                          <button type="button" className="footer-modal-submit" onClick={handleForgotVerifyOtp} disabled={forgotLoading || forgotOtp.some(d => !d)}>
                             {forgotLoading ? 'Verifying...' : 'Verify OTP'}
                           </button>
-                          <div style={{ textAlign: 'center' }}>
-                            <button
-                              type="button"
-                              onClick={handleForgotResendOtp}
-                              disabled={forgotLoading || forgotResendCount >= 5 || forgotOtpTimer > 0}
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                color: forgotResendCount >= 5 ? '#dc3545' : '#007bff',
-                                textDecoration: 'underline',
-                                cursor: forgotResendCount >= 5 || forgotOtpTimer > 0 ? 'not-allowed' : 'pointer'
-                              }}
-                            >
-                              {forgotResendCount >= 5 ? 'Resend limit reached' : `Resend OTP${forgotResendCount > 0 ? ` (${5 - forgotResendCount} left)` : ''}`}
-                            </button>
-                          </div>
+                          <button type="button" className="footer-modal-link" onClick={handleForgotResendOtp} disabled={forgotLoading || forgotResendCount >= 5 || forgotOtpTimer > 0}>
+                            {forgotResendCount >= 5 ? 'Resend limit reached' : `Resend OTP${forgotResendCount > 0 ? ` (${5 - forgotResendCount} left)` : ''}`}
+                          </button>
                         </div>
                       )}
-
                       {forgotStep === 3 && (
-                        <div>
+                        <div className="footer-modal-form">
                           <p style={{ marginBottom: '20px', textAlign: 'center' }}>Enter your new password</p>
-                          <input
-                            type="password"
-                            placeholder="New Password"
-                            value={forgotNewPassword}
-                            onChange={e => setForgotNewPassword(e.target.value)}
-                            style={{
-                              width: '100%',
-                              padding: '12px',
-                              border: '1px solid #ddd',
-                              borderRadius: '5px',
-                              marginBottom: '15px',
-                              fontSize: '16px'
-                            }}
-                            required
-                          />
-                          <input
-                            type="password"
-                            placeholder="Confirm New Password"
-                            value={forgotConfirmPassword}
-                            onChange={e => setForgotConfirmPassword(e.target.value)}
-                            style={{
-                              width: '100%',
-                              padding: '12px',
-                              border: '1px solid #ddd',
-                              borderRadius: '5px',
-                              marginBottom: '15px',
-                              fontSize: '16px'
-                            }}
-                            required
-                          />
-                          <button
-                            type="button"
-                            onClick={handleForgotResetPassword}
-                            disabled={forgotLoading}
-                            style={{
-                              width: '100%',
-                              padding: '12px',
-                              backgroundColor: '#28a745',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '5px',
-                              fontSize: '16px',
-                              cursor: forgotLoading ? 'not-allowed' : 'pointer'
-                            }}
-                          >
+                          <input type="password" placeholder="New Password" value={forgotNewPassword} onChange={e => setForgotNewPassword(e.target.value)} required />
+                          <input type="password" placeholder="Confirm New Password" value={forgotConfirmPassword} onChange={e => setForgotConfirmPassword(e.target.value)} required />
+                          <button type="button" className="footer-modal-submit" onClick={handleForgotResetPassword} disabled={forgotLoading}>
                             {forgotLoading ? 'Updating...' : 'Update Password'}
                           </button>
                         </div>
                       )}
-
                       <div style={{ textAlign: 'center', marginTop: '14px' }}>
-                        <button
-                          type="button"
-                          onClick={handleForgotClose}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: '#2563eb',
-                            textDecoration: 'underline',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          Back to Login
-                        </button>
+                        <button type="button" className="footer-modal-link" onClick={handleForgotClose}>Back to Login</button>
                       </div>
                     </div>
                   )}
-                  {/* Job Seeker Login (default) */}
                   <div id="seeker-signin-panel" style={{ display: !forgotModalOpen && signinPanel === 'seeker' ? 'block' : 'none' }}>
                     <h2 className="footer-modal-heading" style={{ textAlign: 'center' }}>User Login</h2>
                     <form className="footer-modal-form" onSubmit={handleSeekerLogin} autoComplete="off">
-                      <input type="email" placeholder="Enter your email or phone number" value={seekerLogin.email} onChange={e => setSeekerLogin({ ...seekerLogin, email: e.target.value })} required />
+                      <input type="text" autoComplete="username" placeholder="Enter your email or phone number" value={seekerLogin.email} onChange={e => setSeekerLogin({ ...seekerLogin, email: e.target.value })} required />
                       <input type="password" placeholder="Password" value={seekerLogin.password} onChange={e => setSeekerLogin({ ...seekerLogin, password: e.target.value })} required />
                       <div className="footer-modal-row">
-                        <label className="footer-modal-checkbox"><input type="checkbox" id="seeker-remember" /> Remember Me</label>
-                        <a
-                          href="#"
-                          className="footer-modal-link"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            // Reset forgot state on open (UI only; existing logic unchanged)
-                            setForgotStep(1);
-                            setForgotEmail(seekerLogin.email || '');
-                            setForgotOtp(['', '', '', '', '', '']);
-                            setForgotOtpTimer(60);
-                            setForgotResendCount(0);
-                            setForgotNewPassword('');
-                            setForgotConfirmPassword('');
-                            setForgotLoading(false);
-                            setForgotMessage('');
-                            setSigninPanel('seeker');
-                            setForgotModalOpen(true);
-                          }}
-                        >
-                          Forgot Password?
-                        </a>
+                        <a href="#" className="footer-modal-link" onClick={e => {
+                          e.preventDefault();
+                          setForgotStep(1);
+                          setForgotEmail(seekerLogin.email || '');
+                          setForgotOtp(['', '', '', '', '', '']);
+                          setForgotOtpTimer(60);
+                          setForgotOtpExpired(false);
+                          setForgotResendCount(0);
+                          setForgotNewPassword('');
+                          setForgotConfirmPassword('');
+                          setForgotLoading(false);
+                          setForgotMessage('');
+                          setSigninPanel('seeker');
+                          setForgotModalOpen(true);
+                        }}>Forgot Password?</a>
                       </div>
                       <button type="submit" className="footer-modal-submit" disabled={loading}>{loading ? 'Logging in...' : 'LogIn'}</button>
                     </form>
@@ -1259,6 +1155,7 @@ function Footer() {
                         setIsOtpStep(false);
                         setOtp(['', '', '', '', '', '']);
                         setOtpTimer(60);
+                        setOtpExpired(false);
                         setResendCount(0);
                         const signinModal = document.getElementById('signin');
                         const registerModal = document.getElementById('register');
@@ -1276,54 +1173,10 @@ function Footer() {
                     </div>
                     <div className="footer-modal-or">OR</div>
                     <div className="footer-modal-social-row">
-                      <a
-                        href="#"
-                        className="gplus-log-btn log-btn"
-                        style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}
-                        onClick={e => { e.preventDefault(); handleGoogleAuth('seeker', 'signin', 'login'); }}
-                      >
-                       <img 
-                        src="/assets/img/google.png" 
-                        alt="Google" 
-                        style={{ 
-                          width: '20px', 
-                          height: '20px',
-                          marginRight: '8px',
-                          marginBottom: '0px',
-                          display: 'block',
-                          flexShrink: 0,
-                          verticalAlign: 'unset'
-                        }} 
-                      /> Continue with Google
+                      <a href="#" className="gplus-log-btn log-btn" style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={e => { e.preventDefault(); handleGoogleAuth('seeker', 'signin', 'login'); }}>
+                        <img src="/assets/img/google.png" alt="Google" style={{ width: '20px', height: '20px', marginRight: '8px', display: 'block', flexShrink: 0, verticalAlign: 'unset', marginBottom: '0px' }} /> Continue with Google
                       </a>
                     </div>
-                    {/* <div className="footer-modal-social-row">
-                      <a
-                        href="#"
-                        className="gplus-log-btn log-btn"
-                        style={{
-                          width: '100%',
-                          display: 'flex',
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                          gap: '8px',
-                          textDecoration: 'none'
-                        }}
-                        onClick={e => { e.preventDefault(); handleGoogleAuth('seeker', 'signin', 'login'); }}
-                      >
-                        <img
-                          src="/assets/img/google.png"
-                          alt="Google"
-                          style={{
-                            width: '20px',
-                            height: '20px',
-                            display: 'block',
-                            flexShrink: 0
-                          }}
-                        />
-                        <span>Continue with Google</span>
-                      </a>
-                    </div> */}
                     <div className="footer-modal-switch-provider">
                       <span>If you are employer then to login </span>
                       <a href="#" style={{ color: '#2563eb', textDecoration: 'underline' }} onClick={e => { e.preventDefault(); setSigninPanel('provider'); }}>click here</a>
@@ -1333,31 +1186,25 @@ function Footer() {
                   <div id="provider-signin-panel" style={{ display: !forgotModalOpen && signinPanel === 'provider' ? 'block' : 'none' }}>
                     <h2 className="footer-modal-heading" style={{ textAlign: 'center' }}>Employer Login</h2>
                     <form className="footer-modal-form" onSubmit={handleProviderLogin} autoComplete="off">
-                      <input type="email" placeholder="Enter your email or phone number" value={providerLogin.email} onChange={e => setProviderLogin({ ...providerLogin, email: e.target.value })} required />
+                      <input type="text" autoComplete="username" placeholder="Enter your email or phone number" value={providerLogin.email} onChange={e => setProviderLogin({ ...providerLogin, email: e.target.value })} required />
                       <input type="password" placeholder="Password" value={providerLogin.password} onChange={e => setProviderLogin({ ...providerLogin, password: e.target.value })} required />
                       <div className="footer-modal-row">
-                        <label className="footer-modal-checkbox"><input type="checkbox" id="provider-remember" /> Remember Me</label>
-                        <a
-                          href="#"
-                          className="footer-modal-link"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            // Reset forgot state on open (UI only; existing logic unchanged)
-                            setForgotStep(1);
-                            setForgotEmail(providerLogin.email || '');
-                            setForgotOtp(['', '', '', '', '', '']);
-                            setForgotOtpTimer(60);
-                            setForgotResendCount(0);
-                            setForgotNewPassword('');
-                            setForgotConfirmPassword('');
-                            setForgotLoading(false);
-                            setForgotMessage('');
-                            setSigninPanel('provider');
-                            setForgotModalOpen(true);
-                          }}
-                        >
-                          Forgot Password?
-                        </a>
+                        <a href="#" className="footer-modal-link" onClick={e => {
+                          e.preventDefault();
+                          // Reset forgot state on open (UI only; existing logic unchanged)
+                          setForgotStep(1);
+                          setForgotEmail(providerLogin.email || '');
+                          setForgotOtp(['', '', '', '', '', '']);
+                          setForgotOtpTimer(60);
+                          setForgotOtpExpired(false);
+                          setForgotResendCount(0);
+                          setForgotNewPassword('');
+                          setForgotConfirmPassword('');
+                          setForgotLoading(false);
+                          setForgotMessage('');
+                          setSigninPanel('provider');
+                          setForgotModalOpen(true);
+                        }}>Forgot Password?</a>
                       </div>
                       <button type="submit" className="footer-modal-submit" disabled={loading}>{loading ? 'Logging in...' : 'LogIn'}</button>
                     </form>
@@ -1369,6 +1216,7 @@ function Footer() {
                         setIsOtpStep(false);
                         setOtp(['', '', '', '', '', '']);
                         setOtpTimer(60);
+                        setOtpExpired(false);
                         setResendCount(0);
                         const signinModal = document.getElementById('signin');
                         const registerModal = document.getElementById('register');
@@ -1386,10 +1234,9 @@ function Footer() {
                     </div>
                     <div className="footer-modal-or">OR</div>
                     <div className="footer-modal-social-row">
-                      <a href="#"
-                        className="gplus-log-btn log-btn"
-                        style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}
-                        onClick={e => { e.preventDefault(); handleGoogleAuth('provider', 'signin', 'login'); }}><img src="/assets/img/google.png" alt="Google" style={{ width: '20px', height: '20px', marginRight: '8px', display: 'block', flexShrink: 0, verticalAlign: 'unset', marginBottom: '0px' }} /> Continue with Google</a>
+                      <a href="#" className="gplus-log-btn log-btn" style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={e => { e.preventDefault(); handleGoogleAuth('provider', 'signin', 'login'); }}>
+                        <img src="/assets/img/google.png" alt="Google" style={{ width: '20px', height: '20px', marginRight: '8px', display: 'block', flexShrink: 0, verticalAlign: 'unset', marginBottom: '0px' }} /> Continue with Google
+                      </a>
                     </div>
                     <div className="footer-modal-switch-provider">
                       <span>To login as job seeker </span>
@@ -1404,24 +1251,16 @@ function Footer() {
       </div>
 
       {/* Register Modal with click-outside-to-close and individual forms */}
-      <div
-        className="modal fade"
-        id="register"
-        tabIndex={-1}
-        role="dialog"
-        aria-labelledby="registerModalLabel"
-        aria-hidden="true"
-        onClick={e => {
-          if (e.target.id === 'register') {
-            document.getElementById('register').classList.remove('in');
-            document.getElementById('register').style.display = 'none';
-            document.body.classList.remove('modal-open');
-            // Remove modal-backdrop if present
-            const backdrops = document.querySelectorAll('.modal-backdrop');
-            backdrops.forEach((el) => el.parentNode && el.parentNode.removeChild(el));
-          }
-        }}
-      >
+      <div className="modal fade" id="register" tabIndex={-1} role="dialog" aria-labelledby="registerModalLabel" aria-hidden="true" onClick={e => {
+        if (e.target.id === 'register') {
+          document.getElementById('register').classList.remove('in');
+          document.getElementById('register').style.display = 'none';
+          document.body.classList.remove('modal-open');
+          // Remove modal-backdrop if present
+          const backdrops = document.querySelectorAll('.modal-backdrop');
+          backdrops.forEach((el) => el.parentNode && el.parentNode.removeChild(el));
+        }
+      }}>
         <div className="modal-dialog">
           <div className="modal-content" id="registerModalLabel" onClick={e => e.stopPropagation()}>
             <div className="modal-body">
@@ -1515,7 +1354,7 @@ function Footer() {
                     // OTP Verification Modal
                     <>
                       <h2 className="footer-modal-heading" style={{ textAlign: 'center', marginTop: '0', paddingTop: '0', marginBottom: '18px' }}>Verify Your Email</h2>
-                      <p style={{ textAlign: 'center', marginBottom: '20px', color: '#64748b' }}>OTP sent to your email</p>
+                      <p style={{ textAlign: 'center', marginBottom: '20px', color: '#64748b' }}>OTP sent to {otpDeliveryTarget(otpSentVia)}</p>
 
                       <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '20px' }}>
                         {otp.map((digit, index) => (
@@ -1545,8 +1384,10 @@ function Footer() {
                       <div style={{ textAlign: 'center', marginBottom: '15px' }}>
                         {otpTimer > 0 ? (
                           <span style={{ color: '#64748b' }}>Resend OTP in {otpTimer}s</span>
-                        ) : (
+                        ) : otpExpired ? (
                           <span style={{ color: '#dc2626' }}>OTP expired</span>
+                        ) : (
+                          <span style={{ color: '#64748b' }}>Resend OTP available</span>
                         )}
                       </div>
 
@@ -1657,11 +1498,6 @@ function Footer() {
                   font-size: 1.04rem;
                   color: #64748b;
                 }
-                .footer-modal-checkbox {
-                  display: flex;
-                  align-items: center;
-                  gap: 6px;
-                }
                 .footer-modal-link {
                   color: #16a34a;
                   text-decoration: none;
@@ -1712,203 +1548,6 @@ function Footer() {
           Scroll
         </Link>
       </div>
-
-      {/* Forgot Password Modal (disabled; shown inside signin modal now) */}
-      {false && forgotModalOpen && (
-        <div
-          className="modal fade show"
-          style={{
-            display: 'block',
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0,0,0,0.5)',
-            zIndex: 2000
-          }}
-          onClick={handleForgotClose}
-        >
-          <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '400px' }} onClick={e => e.stopPropagation()}>
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">Forgot Password</h5>
-                <button type="button" className="close" onClick={handleForgotClose}>
-                  <span>&times;</span>
-                </button>
-              </div>
-              <div className="modal-body">
-                {forgotMessage && (
-                  <div className={`alert ${forgotMessage.includes('success') ? 'alert-success' : 'alert-danger'}`} style={{ marginBottom: '15px' }}>
-                    {forgotMessage}
-                  </div>
-                )}
-
-                {forgotStep === 1 && (
-                  <div>
-                    <p style={{ marginBottom: '20px', textAlign: 'center' }}>Enter your email address to reset your password</p>
-                    <input
-                      type="email"
-                      placeholder="Email Address"
-                      value={forgotEmail}
-                      onChange={e => setForgotEmail(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '12px',
-                        border: '1px solid #ddd',
-                        borderRadius: '5px',
-                        marginBottom: '15px',
-                        fontSize: '16px'
-                      }}
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={handleForgotSendOTP}
-                      disabled={forgotLoading}
-                      style={{
-                        width: '100%',
-                        padding: '12px',
-                        backgroundColor: '#007bff',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '5px',
-                        fontSize: '16px',
-                        cursor: forgotLoading ? 'not-allowed' : 'pointer'
-                      }}
-                    >
-                      {forgotLoading ? 'Sending...' : 'Send OTP'}
-                    </button>
-                  </div>
-                )}
-
-                {forgotStep === 2 && (
-                  <div>
-                    <p style={{ marginBottom: '20px', textAlign: 'center' }}>Enter the 6-digit OTP sent to your email</p>
-                    <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '20px' }}>
-                      {forgotOtp.map((digit, index) => (
-                        <input
-                          key={index}
-                          id={`forgot-otp-${index}`}
-                          type="text"
-                          value={digit}
-                          onChange={(e) => handleForgotOtpChange(index, e.target.value.replace(/\D/g, ''))}
-                          onKeyDown={(e) => handleForgotOtpKeyDown(index, e)}
-                          onPaste={handleForgotOtpPaste}
-                          maxLength="1"
-                          style={{
-                            width: '40px',
-                            height: '40px',
-                            textAlign: 'center',
-                            border: '1.5px solid #e5e7eb',
-                            borderRadius: '7px',
-                            fontSize: '18px',
-                            background: '#f8fafc',
-                            outline: 'none',
-                            transition: 'border-color 0.2s'
-                          }}
-                          autoFocus={index === 0}
-                        />
-                      ))}
-                    </div>
-                    <div style={{ textAlign: 'center', marginBottom: '15px' }}>
-                      {forgotOtpTimer > 0 ? (
-                        <span>Resend OTP in {forgotOtpTimer}s</span>
-                      ) : (
-                        <span style={{ color: 'red' }}>OTP expired</span>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleForgotVerifyOtp}
-                      disabled={forgotLoading || forgotOtp.some(d => !d)}
-                      style={{
-                        width: '100%',
-                        padding: '12px',
-                        backgroundColor: '#28a745',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '5px',
-                        fontSize: '16px',
-                        marginBottom: '10px',
-                        cursor: forgotLoading || forgotOtp.some(d => !d) ? 'not-allowed' : 'pointer'
-                      }}
-                    >
-                      {forgotLoading ? 'Verifying...' : 'Verify OTP'}
-                    </button>
-                    <div style={{ textAlign: 'center' }}>
-                      <button
-                        type="button"
-                        onClick={handleForgotResendOtp}
-                        disabled={forgotLoading || forgotResendCount >= 5 || forgotOtpTimer > 0}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: forgotResendCount >= 5 ? '#dc3545' : '#007bff',
-                          textDecoration: 'underline',
-                          cursor: forgotResendCount >= 5 || forgotOtpTimer > 0 ? 'not-allowed' : 'pointer'
-                        }}
-                      >
-                        {forgotResendCount >= 5 ? 'Resend limit reached' : `Resend OTP${forgotResendCount > 0 ? ` (${5 - forgotResendCount} left)` : ''}`}
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {forgotStep === 3 && (
-                  <div>
-                    <p style={{ marginBottom: '20px', textAlign: 'center' }}>Enter your new password</p>
-                    <input
-                      type="password"
-                      placeholder="New Password"
-                      value={forgotNewPassword}
-                      onChange={e => setForgotNewPassword(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '12px',
-                        border: '1px solid #ddd',
-                        borderRadius: '5px',
-                        marginBottom: '15px',
-                        fontSize: '16px'
-                      }}
-                      required
-                    />
-                    <input
-                      type="password"
-                      placeholder="Confirm Password"
-                      value={forgotConfirmPassword}
-                      onChange={e => setForgotConfirmPassword(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '12px',
-                        border: '1px solid #ddd',
-                        borderRadius: '5px',
-                        marginBottom: '15px',
-                        fontSize: '16px'
-                      }}
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={handleForgotResetPassword}
-                      disabled={forgotLoading}
-                      style={{
-                        width: '100%',
-                        padding: '12px',
-                        backgroundColor: '#28a745',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '5px',
-                        fontSize: '16px',
-                        cursor: forgotLoading ? 'not-allowed' : 'pointer'
-                      }}
-                    >
-                      {forgotLoading ? 'Updating...' : 'Update Password'}
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
     </>
   );
