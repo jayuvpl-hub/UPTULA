@@ -1113,37 +1113,46 @@ function RegisterPage() {
       const data = await response.json();
 
       if (response.ok) {
-        const loginResponse = await fetch(`${API_BASE_URL}/api/auth/login`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            email: verifyEmail,
-            password: seekerForm.password,
-            role: "seeker",
-          }),
-        });
-
-        const loginData = await loginResponse.json();
-
-        if (loginResponse.ok) {
-          login(loginData.user, loginData.token);
-          localStorage.removeItem("referralCode");
-          setSeekerForm({
-            fullName: "",
-            email: "",
-            phone: "",
-            password: "",
-            confirmPassword: "",
+        let sessionUser = data.user;
+        let sessionToken = data.token;
+        if (!sessionUser || !sessionToken) {
+          const loginResponse = await fetch(`${API_BASE_URL}/api/auth/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: verifyEmail,
+              password: seekerForm.password,
+              role: "seeker",
+            }),
           });
-          setIsOtpStep(false);
-          setOtp(["", "", "", "", "", ""]);
-          setCurrentEmail("");
-          setCurrentRole("");
-          navigate("/profile");
-          setMessage("Registration successful!");
-        } else {
-          setMessage("Registration completed but login failed. Please login manually.");
+          const loginData = await loginResponse.json();
+          if (loginResponse.ok) {
+            sessionUser = loginData.user;
+            sessionToken = loginData.token;
+          }
         }
+
+        localStorage.removeItem("referralCode");
+        setSeekerForm({
+          fullName: "",
+          email: "",
+          phone: "",
+          password: "",
+          confirmPassword: "",
+        });
+        setIsOtpStep(false);
+        setOtp(["", "", "", "", "", ""]);
+        setCurrentEmail("");
+        setCurrentRole("");
+        if (sessionUser && sessionToken) {
+          try {
+            await login(sessionUser, sessionToken);
+          } catch (sessionErr) {
+            console.error(sessionErr);
+          }
+        }
+        setMessage("Registration successful!");
+        navigate("/");
       } else {
         setMessage(data?.message || "OTP verification failed");
       }

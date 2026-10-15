@@ -526,69 +526,72 @@ function Footer() {
       const data = await response.json();
 
       if (response.ok) {
-        // Auto login after successful verification
-        const loginResponse = await fetch(`${API_BASE_URL}/api/auth/login`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            email: currentEmail,
-            password: currentRole === 'seeker' ? seekerForm.password : providerForm.password,
-            role: currentRole
-          })
-        });
+        let sessionUser = data.user;
+        let sessionToken = data.token;
 
-        const loginData = await loginResponse.json();
-
-        if (loginResponse.ok) {
-          login(loginData.user, loginData.token);
-          localStorage.removeItem('referralCode');
-
-          // Close modals
-          const registerModal = document.getElementById('register');
-          if (registerModal) {
-            registerModal.classList.remove('in');
-            registerModal.style.display = 'none';
-          }
-          document.body.classList.remove('modal-open');
-          const backdrops = document.querySelectorAll('.modal-backdrop');
-          backdrops.forEach((el) => el.parentNode && el.parentNode.removeChild(el));
-
-          // Reset forms
-          setSeekerForm({
-            fullName: '',
-            email: '',
-            phone: '',
-            password: '',
-            confirmPassword: '',
-            categoryId: '',
-            subcategoryId: ''
+        if (!sessionUser || !sessionToken) {
+          const loginResponse = await fetch(`${API_BASE_URL}/api/auth/login`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              email: currentEmail,
+              password: currentRole === 'seeker' ? seekerForm.password : providerForm.password,
+              role: currentRole
+            })
           });
-          setProviderForm({
-            fullName: '',
-            email: '',
-            phone: '',
-            password: '',
-            confirmPassword: '',
-            categoryId: '',
-            subcategoryId: ''
-          });
-          setIsOtpStep(false);
-          setOtp(['', '', '', '', '', '']);
-          setOtpExpired(false);
-
-          // Navigate
-          if (currentRole === 'provider') {
-            navigate('/employer/profile');
-          } else {
-            navigate('/profile');
+          const loginData = await loginResponse.json();
+          if (loginResponse.ok) {
+            sessionUser = loginData.user;
+            sessionToken = loginData.token;
           }
-
-          setMessage('Registration successful!');
-        } else {
-          setMessage('Registration completed but login failed. Please login manually.');
         }
+
+        localStorage.removeItem('referralCode');
+
+        const registerModal = document.getElementById('register');
+        if (registerModal) {
+          registerModal.classList.remove('in');
+          registerModal.style.display = 'none';
+        }
+        document.body.classList.remove('modal-open');
+        const backdrops = document.querySelectorAll('.modal-backdrop');
+        backdrops.forEach((el) => el.parentNode && el.parentNode.removeChild(el));
+
+        setSeekerForm({
+          fullName: '',
+          email: '',
+          phone: '',
+          password: '',
+          confirmPassword: '',
+          categoryId: '',
+          subcategoryId: ''
+        });
+        setProviderForm({
+          fullName: '',
+          email: '',
+          phone: '',
+          password: '',
+          confirmPassword: '',
+          categoryId: '',
+          subcategoryId: ''
+        });
+        setIsOtpStep(false);
+        setOtp(['', '', '', '', '', '']);
+        setOtpExpired(false);
+        setCurrentEmail('');
+        setCurrentRole('');
+
+        if (sessionUser && sessionToken) {
+          try {
+            await login(sessionUser, sessionToken);
+          } catch (sessionErr) {
+            console.error(sessionErr);
+          }
+        }
+
+        setMessage('Registration successful!');
       } else {
         const errorMessage = apiErrorMessage(data, 'OTP verification failed');
         setOtpExpired(String(errorMessage).toLowerCase().includes('expired'));
@@ -682,7 +685,7 @@ function Footer() {
         // Navigate to candidate profile
         navigate('/profile');
       } else {
-        setMessage(data.message || 'Login failed');
+        setMessage(apiErrorMessage(data, 'Login failed'));
       }
     } catch (error) {
       setMessage('Network error. Please try again.');
@@ -725,7 +728,7 @@ function Footer() {
         // Navigate to employer profile
         navigate('/employer/profile');
       } else {
-        setMessage(data.message || 'Login failed');
+        setMessage(apiErrorMessage(data, 'Login failed'));
       }
     } catch (error) {
       setMessage('Network error. Please try again.');

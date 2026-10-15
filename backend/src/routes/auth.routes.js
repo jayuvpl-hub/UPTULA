@@ -679,7 +679,31 @@ router.post('/verify-register-otp', async (req, res) => {
       console.warn('Failed to send registration welcome email:', emailErr.message);
     }
 
-    return res.json({ message: 'Registration successful' });
+    try {
+      await query('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?', [newUserId]);
+    } catch (_) { /* non-blocking */ }
+
+    const jwtToken = jwt.sign(
+      {
+        id: newUserId,
+        role: record.role,
+        email: storedEmail,
+        fullName: record.full_name,
+      },
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRES_IN }
+    );
+
+    return res.json({
+      message: 'Registration successful',
+      token: jwtToken,
+      user: {
+        id: newUserId,
+        role: record.role,
+        email: storedEmail,
+        fullName: record.full_name,
+      },
+    });
 
   } catch (err) {
     console.error(err);
@@ -705,34 +729,17 @@ router.post(
       const { email: loginId, password } = req.body;
       const identifier = String(loginId || '').trim();
       const isEmailLogin = identifier.includes('@');
-      let user;
-      if (isEmailLogin) {
-        const userRows = await query(
-          'SELECT id, role, full_name, email, password_hash, auth_provider FROM users WHERE email = ? LIMIT 1',
-          [identifier.toLowerCase()]
-        );
-        if (userRows.length === 0) {
-          return res.status(401).json({ message: 'User not found' });
-        }
-        if (userRows[0].auth_provider === 'google') {
-          return res.status(400).json({ message: GOOGLE_ACCOUNT_MESSAGE });
-        }
-        if (!(await verifyPassword(password, userRows[0].password_hash))) {
-          return res.status(401).json({ message: 'Incorrect Password' });
-        }
-        user = userRows[0];
-      } else {
-        const phoneAccount = await findAccountByPhone(identifier);
-        if (!phoneAccount) {
-          return res.status(401).json({ message: 'User not found' });
-        }
-        if (phoneAccount.auth_provider === 'google') {
-          return res.status(400).json({ message: GOOGLE_ACCOUNT_MESSAGE });
-        }
-        if (!(await verifyPassword(password, phoneAccount.password_hash))) {
-          return res.status(401).json({ message: 'Incorrect Password' });
-        }
-        user = phoneAccount;
+      const user = isEmailLogin
+        ? await findAccountByEmail(identifier)
+        : await findAccountByPhone(identifier);
+      if (!user) {
+        return res.status(401).json({ message: 'User not found' });
+      }
+      const passwordOk = await verifyPassword(password, user.password_hash);
+      if (!passwordOk) {
+        return res.status(401).json({
+          message: user.auth_provider === 'google' ? GOOGLE_ACCOUNT_MESSAGE : 'Incorrect Password',
+        });
       }
 
       if (user.role !== req.body.role) {
