@@ -330,10 +330,8 @@ async function dispatchOtp(purpose, { email, phone, fullName, code, isResend }) 
     if (result.status === 'fulfilled') {
       sentVia.push(result.value);
       logDev(`channel=${channel} ok`);
-    } else if (!isProduction) {
-      console.warn(`[otp] channel=${channel} failed:`, result.reason && result.reason.message);
     } else {
-      console.warn(`[otp] channel=${channel} failed`);
+      console.warn(`[otp] channel=${channel} failed:`, result.reason && result.reason.message);
     }
   });
 

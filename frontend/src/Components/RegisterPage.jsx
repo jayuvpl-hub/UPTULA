@@ -1,805 +1,3 @@
-// import React, { useState } from "react";
-// import { useNavigate, Link } from "react-router-dom";
-// import { useAuth } from "../context/AuthContext";
-// import { API_BASE_URL } from "../config/api";
-// import RegistrationCategoryFields from "./RegistrationCategoryFields";
-// import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
-// import { auth as firebaseAuth, missingKeys as firebaseMissingKeys } from "../config/firebaseClient";
-
-// function RegisterPage() {
-//   const [registerType, setRegisterType] = useState("seeker");
-//   const navigate = useNavigate();
-//   const { login } = useAuth();
-
-//   const [seekerForm, setSeekerForm] = useState({
-//     fullName: "",
-//     email: "",
-//     phone: "",
-//     password: "",
-//     confirmPassword: "",
-//     categoryId: "",
-//     subcategoryId: "",
-//   });
-
-//   const [providerForm, setProviderForm] = useState({
-//     fullName: "",
-//     email: "",
-//     phone: "",
-//     password: "",
-//     confirmPassword: "",
-//     categoryId: "",
-//     subcategoryId: "",
-//   });
-
-//   const [isOtpStep, setIsOtpStep] = useState(false);
-//   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
-//   const [otpTimer, setOtpTimer] = useState(60);
-//   const [resendCount, setResendCount] = useState(0);
-//   const [currentEmail, setCurrentEmail] = useState("");
-//   const [currentRole, setCurrentRole] = useState("");
-//   const [loading, setLoading] = useState(false);
-//   const [message, setMessage] = useState("");
-//   const messageTimerRef = React.useRef(null);
-
-//   React.useEffect(() => {
-//     let interval;
-//     if (isOtpStep && otpTimer > 0) {
-//       interval = setInterval(() => setOtpTimer((prev) => prev - 1), 1000);
-//     }
-//     return () => clearInterval(interval);
-//   }, [isOtpStep, otpTimer]);
-
-//   const isSuccessMessage = (text) => {
-//     const t = String(text || "").toLowerCase();
-//     if (!t) return false;
-//     if (
-//       t.includes("not found") ||
-//       t.includes("incorrect") ||
-//       t.includes("failed") ||
-//       t.includes("error") ||
-//       t.includes("do not match") ||
-//       t.includes("at least") ||
-//       t.includes("maximum resend") ||
-//       t.includes("missing:")
-//     ) return false;
-//     return t.includes("success") || t.includes("otp sent") || t.includes("otp resent");
-//   };
-
-//   React.useEffect(() => {
-//     if (!message) return;
-//     if (messageTimerRef.current) clearTimeout(messageTimerRef.current);
-//     const hideMs = isSuccessMessage(message) ? 3000 : 4000;
-//     messageTimerRef.current = setTimeout(() => {
-//       setMessage("");
-//       messageTimerRef.current = null;
-//     }, hideMs);
-//     return () => {
-//       if (messageTimerRef.current) {
-//         clearTimeout(messageTimerRef.current);
-//         messageTimerRef.current = null;
-//       }
-//     };
-//   }, [message]);
-
-//   const handleGoogleAuth = async (role) => {
-//     setLoading(true);
-//     setMessage("");
-//     try {
-//       if (!firebaseAuth) {
-//         const missing =
-//           Array.isArray(firebaseMissingKeys) && firebaseMissingKeys.length
-//             ? firebaseMissingKeys.join(", ")
-//             : "Firebase config";
-//         setMessage(`Google login is not configured. Missing: ${missing}.`);
-//         return;
-//       }
-//       const provider = new GoogleAuthProvider();
-//       const result = await signInWithPopup(firebaseAuth, provider);
-//       const idToken = await result.user.getIdToken();
-//       const response = await fetch(`${API_BASE_URL}/api/auth/firebase`, {
-//         method: "POST",
-//         headers: { "Content-Type": "application/json" },
-//         body: JSON.stringify({ token: idToken, role }),
-//       });
-//       const data = await response.json();
-//       if (response.ok) {
-//         login(data.user, data.token);
-//         if (role === "provider") navigate("/employer/profile");
-//         else navigate("/profile");
-//         setMessage("Login successful!");
-//       } else {
-//         setMessage(data?.message || "Google sign-in failed");
-//       }
-//     } catch (err) {
-//       console.error("Google auth error:", err);
-//       setMessage("Google sign-in failed. Please try again.");
-//     } finally {
-//       setLoading(false);
-//     }
-//   };
-
-//   const handleSeekerRegister = async (e) => {
-//     e.preventDefault();
-//     setLoading(true);
-//     setMessage("");
-
-//     if (seekerForm.password !== seekerForm.confirmPassword) {
-//       setMessage("Passwords do not match");
-//       setLoading(false);
-//       return;
-//     }
-//     if (seekerForm.password.length < 6) {
-//       setMessage("Password must be at least 6 characters");
-//       setLoading(false);
-//       return;
-//     }
-//     if (!seekerForm.categoryId || !seekerForm.subcategoryId) {
-//       setMessage("Please select a category and subcategory");
-//       setLoading(false);
-//       return;
-//     }
-
-//     try {
-//       const payload = {
-//         role: "seeker",
-//         fullName: seekerForm.fullName,
-//         email: seekerForm.email,
-//         phone: seekerForm.phone,
-//         password: seekerForm.password,
-//         categoryId: Number(seekerForm.categoryId),
-//         subcategoryId: Number(seekerForm.subcategoryId),
-//       };
-//       const storedReferralCode = localStorage.getItem("referralCode");
-//       if (storedReferralCode) payload.referralCode = storedReferralCode;
-
-//       const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
-//         method: "POST",
-//         headers: { "Content-Type": "application/json" },
-//         body: JSON.stringify(payload),
-//       });
-//       const data = await response.json();
-//       if (response.ok) {
-//         setCurrentEmail(seekerForm.email);
-//         setCurrentRole("seeker");
-//         setIsOtpStep(true);
-//         setOtpTimer(60);
-//         setResendCount(0);
-//         setMessage("OTP sent to your email");
-//       } else {
-//         setMessage(data?.message || "Registration failed");
-//       }
-//     } catch {
-//       setMessage("Network error. Please try again.");
-//     }
-//     setLoading(false);
-//   };
-
-//   const handleProviderRegister = async (e) => {
-//     e.preventDefault();
-//     setLoading(true);
-//     setMessage("");
-
-//     if (providerForm.password !== providerForm.confirmPassword) {
-//       setMessage("Passwords do not match");
-//       setLoading(false);
-//       return;
-//     }
-//     if (providerForm.password.length < 6) {
-//       setMessage("Password must be at least 6 characters");
-//       setLoading(false);
-//       return;
-//     }
-//     if (!providerForm.categoryId || !providerForm.subcategoryId) {
-//       setMessage("Please select a category and subcategory");
-//       setLoading(false);
-//       return;
-//     }
-
-//     try {
-//       const payload = {
-//         role: "provider",
-//         fullName: providerForm.fullName,
-//         email: providerForm.email,
-//         phone: providerForm.phone,
-//         password: providerForm.password,
-//         categoryId: Number(providerForm.categoryId),
-//         subcategoryId: Number(providerForm.subcategoryId),
-//       };
-//       const storedReferralCode = localStorage.getItem("referralCode");
-//       if (storedReferralCode) payload.referralCode = storedReferralCode;
-
-//       const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
-//         method: "POST",
-//         headers: { "Content-Type": "application/json" },
-//         body: JSON.stringify(payload),
-//       });
-//       const data = await response.json();
-//       if (response.ok) {
-//         setCurrentEmail(providerForm.email);
-//         setCurrentRole("provider");
-//         setIsOtpStep(true);
-//         setOtpTimer(60);
-//         setResendCount(0);
-//         setMessage("OTP sent to your email");
-//       } else {
-//         setMessage(data?.message || "Registration failed");
-//       }
-//     } catch {
-//       setMessage("Network error. Please try again.");
-//     }
-//     setLoading(false);
-//   };
-
-//   // OTP handlers
-//   const handleOtpChange = (index, value) => {
-//     if (value.length > 1) return;
-//     const newOtp = [...otp];
-//     newOtp[index] = value;
-//     setOtp(newOtp);
-//     if (value && index < 5) {
-//       const nextInput = document.getElementById(`otp-${index + 1}`);
-//       if (nextInput) nextInput.focus();
-//     }
-//   };
-
-//   const handleOtpKeyDown = (index, e) => {
-//     if (e.key === "Backspace" && !otp[index] && index > 0) {
-//       const prevInput = document.getElementById(`otp-${index - 1}`);
-//       if (prevInput) prevInput.focus();
-//     }
-//   };
-
-//   const handleOtpPaste = (e) => {
-//     e.preventDefault();
-//     const paste = e.clipboardData.getData("text");
-//     const pasteArray = paste.split("").slice(0, 6);
-//     const newOtp = [...otp];
-//     pasteArray.forEach((char, index) => {
-//       if (index < 6 && /^\d$/.test(char)) newOtp[index] = char;
-//     });
-//     setOtp(newOtp);
-//   };
-
-//   const handleVerifyOtp = async () => {
-//     const otpString = otp.join("");
-//     if (otpString.length !== 6) {
-//       setMessage("Please enter complete OTP");
-//       return;
-//     }
-//     setLoading(true);
-//     setMessage("");
-//     try {
-//       const response = await fetch(`${API_BASE_URL}/api/auth/verify-register-otp`, {
-//         method: "POST",
-//         headers: { "Content-Type": "application/json" },
-//         body: JSON.stringify({ email: currentEmail, otp: otpString }),
-//       });
-//       const data = await response.json();
-//       if (response.ok) {
-//         const loginResponse = await fetch(`${API_BASE_URL}/api/auth/login`, {
-//           method: "POST",
-//           headers: { "Content-Type": "application/json" },
-//           body: JSON.stringify({
-//             email: currentEmail,
-//             password: currentRole === "seeker" ? seekerForm.password : providerForm.password,
-//           }),
-//         });
-//         const loginData = await loginResponse.json();
-//         if (loginResponse.ok) {
-//           login(loginData.user, loginData.token);
-//           localStorage.removeItem("referralCode");
-//           setSeekerForm({ fullName: "", email: "", phone: "", password: "", confirmPassword: "", categoryId: "", subcategoryId: "" });
-//           setProviderForm({ fullName: "", email: "", phone: "", password: "", confirmPassword: "", categoryId: "", subcategoryId: "" });
-//           setIsOtpStep(false);
-//           setOtp(["", "", "", "", "", ""]);
-//           if (currentRole === "provider") navigate("/employer/profile");
-//           else navigate("/profile");
-//           setMessage("Registration successful!");
-//         } else {
-//           setMessage("Registration completed but login failed. Please login manually.");
-//         }
-//       } else {
-//         setMessage(data?.message || "OTP verification failed");
-//       }
-//     } catch {
-//       setMessage("Network error. Please try again.");
-//     }
-//     setLoading(false);
-//   };
-
-//   const handleResendOtp = async () => {
-//     if (resendCount >= 5) {
-//       setMessage("Maximum resend attempts reached");
-//       return;
-//     }
-//     setLoading(true);
-//     setMessage("");
-//     try {
-//       const response = await fetch(`${API_BASE_URL}/api/auth/resend-register-otp`, {
-//         method: "POST",
-//         headers: { "Content-Type": "application/json" },
-//         body: JSON.stringify({ email: currentEmail }),
-//       });
-//       const data = await response.json();
-//       if (response.ok) {
-//         setResendCount((prev) => prev + 1);
-//         setOtpTimer(60);
-//         setMessage("OTP resent to your email");
-//       } else {
-//         setMessage(data?.message || "Failed to resend OTP");
-//       }
-//     } catch {
-//       setMessage("Network error. Please try again.");
-//     }
-//     setLoading(false);
-//   };
-
-//   const handleBackToRegister = () => {
-//     setIsOtpStep(false);
-//     setOtp(["", "", "", "", "", ""]);
-//     setOtpTimer(60);
-//     setResendCount(0);
-//     setMessage("");
-//   };
-
-//   // ─── Inline style objects ──────────────────────────────────────────────────
-
-//   const styles = {
-//     page: {
-//       minHeight: "100vh",
-//       background: "#F8F7F4",
-//       display: "flex",
-//       alignItems: "center",
-//       justifyContent: "center",
-//       padding: "40px 16px",
-//       fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif",
-//     },
-//     card: {
-//       background: "#fff",
-//       borderRadius: "16px",
-//       boxShadow: "none",
-//       width: "100%",
-//       maxWidth: "480px",
-//       padding: "36px 32px 28px",
-//     },
-//     toast: (success) => ({
-//       position: "fixed",
-//       top: "20px",
-//       right: "20px",
-//       zIndex: 9999,
-//       maxWidth: "min(360px, calc(100vw - 32px))",
-//       padding: "12px 16px",
-//       borderRadius: "10px",
-//       fontSize: "14px",
-//       fontWeight: 600,
-//       lineHeight: 1.4,
-//       boxShadow: "0 8px 24px rgba(15,23,42,0.14)",
-//       background: success ? "#ecfdf5" : "#ffe5e5",
-//       color: success ? "#047857" : "#ff0000",
-//       border: `1px solid ${success ? "#a7f3d0" : "#ffb3b3"}`,
-//     }),
-//     heading: {
-//       textAlign: "center",
-//       fontSize: "22px",
-//       fontWeight: 700,
-//       color: "#0f172a",
-//       margin: "0 0 20px",
-//     },
-//     tabRow: {
-//       display: "flex",
-//       borderRadius: "8px",
-//       overflow: "hidden",
-//       border: "1.5px solid #e5e7eb",
-//       marginBottom: "24px",
-//     },
-//     tab: (active) => ({
-//       flex: 1,
-//       padding: "10px 0",
-//       textAlign: "center",
-//       fontSize: "14px",
-//       fontWeight: 600,
-//       cursor: "pointer",
-//       border: "none",
-//       outline: "none",
-//       transition: "background 0.18s, color 0.18s",
-//       background: active ? "#16a34a" : "#f8fafc",
-//       color: active ? "#fff" : "#64748b",
-//     }),
-//     form: {
-//       display: "flex",
-//       flexDirection: "column",
-//       gap: "14px",
-//     },
-//     input: {
-//       padding: "12px 13px",
-//       borderRadius: "7px",
-//       border: "1.5px solid #e5e7eb",
-//       fontSize: "15px",
-//       background: "#f8fafc",
-//       color: "#222",
-//       outline: "none",
-//       transition: "border 0.18s, box-shadow 0.18s",
-//       width: "100%",
-//       boxSizing: "border-box",
-//     },
-//     submitBtn: (disabled) => ({
-//       background: disabled ? "#a3a3a3" : "#16a34a",
-//       color: "#fff",
-//       border: "none",
-//       borderRadius: "7px",
-//       padding: "13px 0",
-//       fontSize: "15px",
-//       fontWeight: 700,
-//       marginTop: "4px",
-//       cursor: disabled ? "not-allowed" : "pointer",
-//       boxShadow: "0 2px 8px rgba(16,185,129,0.08)",
-//       transition: "background 0.18s",
-//       width: "100%",
-//     }),
-//     orDivider: {
-//       textAlign: "center",
-//       color: "#94a3b8",
-//       margin: "16px 0 8px",
-//       fontSize: "13px",
-//       fontWeight: 500,
-//       position: "relative",
-//     },
-//     googleBtn: {
-//       width: "100%",
-//       display: "flex",
-//       justifyContent: "center",
-//       alignItems: "center",
-//       gap: "8px",
-//       padding: "10px 18px",
-//       background: "#fff",
-//       color: "#ea4335",
-//       border: "1.5px solid #ea4335",
-//       borderRadius: "7px",
-//       fontSize: "14px",
-//       fontWeight: 600,
-//       cursor: "pointer",
-//       textDecoration: "none",
-//       transition: "background 0.18s, color 0.18s",
-//       boxSizing: "border-box",
-//     },
-//     switchText: {
-//       textAlign: "center",
-//       marginTop: "16px",
-//       fontSize: "13.5px",
-//       color: "#64748b",
-//     },
-//     switchLink: {
-//       color: "#2563eb",
-//       textDecoration: "underline",
-//       cursor: "pointer",
-//       background: "none",
-//       border: "none",
-//       padding: 0,
-//       fontSize: "13.5px",
-//     },
-//     otpContainer: {
-//       display: "flex",
-//       justifyContent: "center",
-//       gap: "8px",
-//       marginBottom: "20px",
-//     },
-//     otpInput: {
-//       width: "44px",
-//       height: "44px",
-//       textAlign: "center",
-//       border: "1.5px solid #e5e7eb",
-//       borderRadius: "7px",
-//       fontSize: "20px",
-//       background: "#f8fafc",
-//       outline: "none",
-//       transition: "border-color 0.2s",
-//     },
-//     timerText: (expired) => ({
-//       textAlign: "center",
-//       marginBottom: "16px",
-//       fontSize: "13.5px",
-//       color: expired ? "#dc2626" : "#64748b",
-//     }),
-//     resendBtn: (disabled) => ({
-//       background: "none",
-//       border: "none",
-//       color: disabled ? "#dc2626" : "#2563eb",
-//       textDecoration: "underline",
-//       cursor: disabled ? "not-allowed" : "pointer",
-//       fontSize: "13.5px",
-//       padding: 0,
-//     }),
-//     backBtn: {
-//       background: "none",
-//       border: "none",
-//       color: "#64748b",
-//       textDecoration: "underline",
-//       cursor: "pointer",
-//       fontSize: "13.5px",
-//       padding: 0,
-//     },
-//   };
-
-//   const [googleHover, setGoogleHover] = useState(false);
-
-//   return (
-//     <div style={styles.page}>
-//       {/* Toast */}
-//       {message && (
-//         <div style={styles.toast(isSuccessMessage(message))} role="alert">
-//           {message}
-//         </div>
-//       )}
-
-//       <div style={styles.card}>
-//         {!isOtpStep ? (
-//           <>
-//             {/* Tab switcher */}
-//             <div style={styles.tabRow}>
-//               <button
-//                 type="button"
-//                 style={styles.tab(registerType === "seeker")}
-//                 onClick={() => {
-//                   setRegisterType("seeker");
-//                   setMessage("");
-//                 }}
-//               >
-//                 Job Seeker
-//               </button>
-//               <button
-//                 type="button"
-//                 style={styles.tab(registerType === "provider")}
-//                 onClick={() => {
-//                   setRegisterType("provider");
-//                   setMessage("");
-//                 }}
-//               >
-//                 Employer
-//               </button>
-//             </div>
-
-//             {/* Seeker form */}
-//             {registerType === "seeker" && (
-//               <>
-//                 <h1 style={styles.heading}>Create Your Account</h1>
-//                 <form style={styles.form} onSubmit={handleSeekerRegister} autoComplete="off">
-//                   <input
-//                     style={styles.input}
-//                     type="text"
-//                     placeholder="Full Name"
-//                     value={seekerForm.fullName}
-//                     onChange={(e) => setSeekerForm({ ...seekerForm, fullName: e.target.value })}
-//                     required
-//                   />
-//                   <input
-//                     style={styles.input}
-//                     type="email"
-//                     placeholder="Email Address"
-//                     value={seekerForm.email}
-//                     onChange={(e) => setSeekerForm({ ...seekerForm, email: e.target.value })}
-//                     required
-//                   />
-//                   <input
-//                     style={styles.input}
-//                     type="tel"
-//                     placeholder="Phone Number"
-//                     value={seekerForm.phone}
-//                     onChange={(e) => setSeekerForm({ ...seekerForm, phone: e.target.value })}
-//                   />
-//                   <input
-//                     style={styles.input}
-//                     type="password"
-//                     placeholder="Password"
-//                     value={seekerForm.password}
-//                     onChange={(e) => setSeekerForm({ ...seekerForm, password: e.target.value })}
-//                     required
-//                   />
-//                   <input
-//                     style={styles.input}
-//                     type="password"
-//                     placeholder="Confirm Password"
-//                     value={seekerForm.confirmPassword}
-//                     onChange={(e) => setSeekerForm({ ...seekerForm, confirmPassword: e.target.value })}
-//                     required
-//                   />
-//                   <RegistrationCategoryFields
-//                     required
-//                     value={{ categoryId: seekerForm.categoryId, subcategoryId: seekerForm.subcategoryId }}
-//                     onChange={({ categoryId, subcategoryId }) =>
-//                       setSeekerForm({ ...seekerForm, categoryId, subcategoryId })
-//                     }
-//                   />
-//                   <button type="submit" style={styles.submitBtn(loading)} disabled={loading}>
-//                     {loading ? "Sending OTP..." : "Create Account"}
-//                   </button>
-//                 </form>
-
-//                 <div style={styles.orDivider}>OR</div>
-
-//                 <button
-//                   type="button"
-//                   style={{
-//                     ...styles.googleBtn,
-//                     ...(googleHover ? { background: "#ea4335", color: "#fff" } : {}),
-//                   }}
-//                   onMouseEnter={() => setGoogleHover(true)}
-//                   onMouseLeave={() => setGoogleHover(false)}
-//                   onClick={() => handleGoogleAuth("seeker")}
-//                 >
-//                   <img
-//                     src="/assets/img/google.png"
-//                     alt="Google"
-//                     style={{ width: "20px", height: "20px", display: "block", flexShrink: 0 }}
-//                   />
-//                   Continue with Google
-//                 </button>
-
-//                 <p style={styles.switchText}>
-//                   Already have an account?{" "}
-//                   <Link to="/login" style={{ color: "#2563eb" }}>
-//                     Sign in
-//                   </Link>
-//                 </p>
-//               </>
-//             )}
-
-//             {/* Provider form */}
-//             {registerType === "provider" && (
-//               <>
-//                 <h1 style={styles.heading}>Employer Registration</h1>
-//                 <form style={styles.form} onSubmit={handleProviderRegister} autoComplete="off">
-//                   <input
-//                     style={styles.input}
-//                     type="text"
-//                     placeholder="Full Name"
-//                     value={providerForm.fullName}
-//                     onChange={(e) => setProviderForm({ ...providerForm, fullName: e.target.value })}
-//                     required
-//                   />
-//                   <input
-//                     style={styles.input}
-//                     type="email"
-//                     placeholder="Email Address"
-//                     value={providerForm.email}
-//                     onChange={(e) => setProviderForm({ ...providerForm, email: e.target.value })}
-//                     required
-//                   />
-//                   <input
-//                     style={styles.input}
-//                     type="tel"
-//                     placeholder="Phone Number"
-//                     value={providerForm.phone}
-//                     onChange={(e) => setProviderForm({ ...providerForm, phone: e.target.value })}
-//                   />
-//                   <input
-//                     style={styles.input}
-//                     type="password"
-//                     placeholder="Password"
-//                     value={providerForm.password}
-//                     onChange={(e) => setProviderForm({ ...providerForm, password: e.target.value })}
-//                     required
-//                   />
-//                   <input
-//                     style={styles.input}
-//                     type="password"
-//                     placeholder="Confirm Password"
-//                     value={providerForm.confirmPassword}
-//                     onChange={(e) => setProviderForm({ ...providerForm, confirmPassword: e.target.value })}
-//                     required
-//                   />
-//                   <RegistrationCategoryFields
-//                     required
-//                     value={{ categoryId: providerForm.categoryId, subcategoryId: providerForm.subcategoryId }}
-//                     onChange={({ categoryId, subcategoryId }) =>
-//                       setProviderForm({ ...providerForm, categoryId, subcategoryId })
-//                     }
-//                   />
-//                   <button type="submit" style={styles.submitBtn(loading)} disabled={loading}>
-//                     {loading ? "Sending OTP..." : "Create Account"}
-//                   </button>
-//                 </form>
-
-//                 <div style={styles.orDivider}>OR</div>
-
-//                 <button
-//                   type="button"
-//                   style={{
-//                     ...styles.googleBtn,
-//                     ...(googleHover ? { background: "#ea4335", color: "#fff" } : {}),
-//                   }}
-//                   onMouseEnter={() => setGoogleHover(true)}
-//                   onMouseLeave={() => setGoogleHover(false)}
-//                   onClick={() => handleGoogleAuth("provider")}
-//                 >
-//                   <img
-//                     src="/assets/img/google.png"
-//                     alt="Google"
-//                     style={{ width: "20px", height: "20px", display: "block", flexShrink: 0 }}
-//                   />
-//                   Continue with Google
-//                 </button>
-
-//                 <p style={styles.switchText}>
-//                   Already have an account?{" "}
-//                   <Link to="/login" style={{ color: "#2563eb" }}>
-//                     Sign in
-//                   </Link>
-//                 </p>
-//               </>
-//             )}
-//           </>
-//         ) : (
-//           // OTP verification step
-//           <>
-//             <h1 style={styles.heading}>Verify Your Email</h1>
-//             <p
-//               style={{
-//                 textAlign: "center",
-//                 marginBottom: "24px",
-//                 color: "#64748b",
-//                 fontSize: "14px",
-//               }}
-//             >
-//               We sent a 6-digit OTP to <strong>{currentEmail}</strong>
-//             </p>
-
-//             <div style={styles.otpContainer}>
-//               {otp.map((digit, index) => (
-//                 <input
-//                   key={index}
-//                   id={`otp-${index}`}
-//                   type="text"
-//                   inputMode="numeric"
-//                   value={digit}
-//                   onChange={(e) => handleOtpChange(index, e.target.value.replace(/\D/g, ""))}
-//                   onKeyDown={(e) => handleOtpKeyDown(index, e)}
-//                   onPaste={handleOtpPaste}
-//                   maxLength="1"
-//                   style={styles.otpInput}
-//                   autoFocus={index === 0}
-//                 />
-//               ))}
-//             </div>
-
-//             <p style={styles.timerText(otpTimer === 0)}>
-//               {otpTimer > 0 ? `Resend OTP in ${otpTimer}s` : "OTP expired"}
-//             </p>
-
-//             <button
-//               type="button"
-//               style={styles.submitBtn(loading || otp.some((d) => !d))}
-//               disabled={loading || otp.some((d) => !d)}
-//               onClick={handleVerifyOtp}
-//             >
-//               {loading ? "Verifying..." : "Verify & Complete Registration"}
-//             </button>
-
-//             <div style={{ textAlign: "center", marginTop: "14px" }}>
-//               <button
-//                 type="button"
-//                 onClick={handleResendOtp}
-//                 disabled={loading || resendCount >= 5 || otpTimer > 0}
-//                 style={styles.resendBtn(resendCount >= 5 || otpTimer > 0)}
-//               >
-//                 {resendCount >= 5
-//                   ? "Resend limit reached"
-//                   : `Resend OTP${resendCount > 0 ? ` (${5 - resendCount} attempts left)` : ""}`}
-//               </button>
-//             </div>
-
-//             <div style={{ textAlign: "center", marginTop: "10px" }}>
-//               <button type="button" onClick={handleBackToRegister} style={styles.backBtn}>
-//                 ← Back to Registration
-//               </button>
-//             </div>
-//           </>
-//         )}
-//       </div>
-//     </div>
-//   );
-// }
-
-// export default RegisterPage;
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -1234,6 +432,9 @@ function RegisterPage() {
 
   const handleSeekerLogin = async (e) => {
     e.preventDefault();
+    const form = e.currentTarget;
+    const email = String(form.email?.value || seekerLogin.email || "").trim();
+    const password = String(form.password?.value || seekerLogin.password || "");
     setLoginLoading(true);
     setLoginMessage("");
 
@@ -1242,8 +443,8 @@ function RegisterPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: seekerLogin.email,
-          password: seekerLogin.password,
+          email,
+          password,
           role: "seeker",
         }),
       });
@@ -1256,7 +457,11 @@ function RegisterPage() {
         setShowLoginModal(false);
         navigate("/profile");
       } else {
-        setLoginMessage(data.message || "Login failed");
+        setLoginMessage(
+          data?.message ||
+          (Array.isArray(data?.errors) && data.errors[0]?.msg) ||
+          "Login failed"
+        );
       }
     } catch (error) {
       setLoginMessage("Network error. Please try again.");
@@ -1266,6 +471,9 @@ function RegisterPage() {
 
   const handleProviderLogin = async (e) => {
     e.preventDefault();
+    const form = e.currentTarget;
+    const email = String(form.email?.value || providerLogin.email || "").trim();
+    const password = String(form.password?.value || providerLogin.password || "");
     setLoginLoading(true);
     setLoginMessage("");
 
@@ -1274,8 +482,8 @@ function RegisterPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: providerLogin.email,
-          password: providerLogin.password,
+          email,
+          password,
           role: "provider",
         }),
       });
@@ -1288,7 +496,11 @@ function RegisterPage() {
         setShowLoginModal(false);
         navigate("/employer/profile");
       } else {
-        setLoginMessage(data.message || "Login failed");
+        setLoginMessage(
+          data?.message ||
+          (Array.isArray(data?.errors) && data.errors[0]?.msg) ||
+          "Login failed"
+        );
       }
     } catch (error) {
       setLoginMessage("Network error. Please try again.");
@@ -2471,11 +1683,13 @@ function RegisterPage() {
                 {loginPanel === "seeker" ? (
                   <div>
                     <h2 style={styles.modalHeading}>User Login</h2>
-                    <form style={styles.form} onSubmit={handleSeekerLogin} autoComplete="off">
+                    <form style={styles.form} onSubmit={handleSeekerLogin} autoComplete="off" noValidate>
                       <div style={styles.inputWrap}>
                         <span style={styles.inputIcon}><MailIcon /></span>
                         <input
-                          type="email"
+                          type="text"
+                          name="email"
+                          autoComplete="username"
                           placeholder="Enter your email or phone number"
                           value={seekerLogin.email}
                           onChange={(e) => setSeekerLogin({ ...seekerLogin, email: e.target.value })}
@@ -2487,6 +1701,8 @@ function RegisterPage() {
                         <span style={styles.inputIcon}><LockIcon /></span>
                         <input
                           type="password"
+                          name="password"
+                          autoComplete="current-password"
                           placeholder="Password"
                           value={seekerLogin.password}
                           onChange={(e) => setSeekerLogin({ ...seekerLogin, password: e.target.value })}
@@ -2570,11 +1786,13 @@ function RegisterPage() {
                 ) : (
                   <div>
                     <h2 style={styles.modalHeading}>Employer Login</h2>
-                    <form style={styles.form} onSubmit={handleProviderLogin} autoComplete="off">
+                    <form style={styles.form} onSubmit={handleProviderLogin} autoComplete="off" noValidate>
                       <div style={styles.inputWrap}>
                         <span style={styles.inputIcon}><MailIcon /></span>
                         <input
-                          type="email"
+                          type="text"
+                          name="email"
+                          autoComplete="username"
                           placeholder="Enter your email or phone number"
                           value={providerLogin.email}
                           onChange={(e) => setProviderLogin({ ...providerLogin, email: e.target.value })}
@@ -2586,6 +1804,8 @@ function RegisterPage() {
                         <span style={styles.inputIcon}><LockIcon /></span>
                         <input
                           type="password"
+                          name="password"
+                          autoComplete="current-password"
                           placeholder="Password"
                           value={providerLogin.password}
                           onChange={(e) => setProviderLogin({ ...providerLogin, password: e.target.value })}
