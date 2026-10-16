@@ -530,17 +530,12 @@ function Footer() {
         let sessionToken = data.token;
 
         if (!sessionUser || !sessionToken) {
-          const loginResponse = await fetch(`${API_BASE_URL}/api/auth/login`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              email: currentEmail,
-              password: currentRole === 'seeker' ? seekerForm.password : providerForm.password,
-              role: currentRole
-            })
-          });
+          const loginRole = currentRole === 'provider' || registerType === 'provider' ? 'provider' : 'seeker';
+          const loginResponse = await postAuthLogin(
+            currentEmail,
+            loginRole === 'provider' ? providerForm.password : seekerForm.password,
+            loginRole
+          );
           const loginData = await loginResponse.json();
           if (loginResponse.ok) {
             sessionUser = loginData.user;
@@ -650,26 +645,33 @@ function Footer() {
   };
 
   // Login handlers
+  const postAuthLogin = (loginEmail, loginPassword, loginRole) => {
+    const role = loginRole === 'provider' ? 'provider' : 'seeker';
+    return fetch(`${API_BASE_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email: String(loginEmail || '').trim(),
+        password: String(loginPassword || ''),
+        role,
+      }),
+    });
+  };
+
   const handleSeekerLogin = async (e) => {
     e.preventDefault();
+    e.stopPropagation();
     const form = e.currentTarget;
-    const email = String(form.email?.value || seekerLogin.email || '').trim();
-    const password = String(form.password?.value || seekerLogin.password || '');
+    const formData = form && form.elements ? new FormData(form) : null;
+    const email = String(formData?.get('loginId') || seekerLogin.email || '').trim();
+    const password = String(formData?.get('loginPassword') || seekerLogin.password || '');
     setLoading(true);
     setMessage('');
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email,
-          password,
-          role: 'seeker'
-        })
-      });
+      const response = await postAuthLogin(email, password, 'seeker');
 
       const data = await response.json();
 
@@ -698,24 +700,16 @@ function Footer() {
 
   const handleProviderLogin = async (e) => {
     e.preventDefault();
+    e.stopPropagation();
     const form = e.currentTarget;
-    const email = String(form.email?.value || providerLogin.email || '').trim();
-    const password = String(form.password?.value || providerLogin.password || '');
+    const formData = form && form.elements ? new FormData(form) : null;
+    const email = String(formData?.get('loginId') || providerLogin.email || '').trim();
+    const password = String(formData?.get('loginPassword') || providerLogin.password || '');
     setLoading(true);
     setMessage('');
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email,
-          password,
-          role: 'provider'
-        })
-      });
+      const response = await postAuthLogin(email, password, 'provider');
 
       const data = await response.json();
 
@@ -1135,8 +1129,8 @@ function Footer() {
                   <div id="seeker-signin-panel" style={{ display: !forgotModalOpen && signinPanel === 'seeker' ? 'block' : 'none' }}>
                     <h2 className="footer-modal-heading" style={{ textAlign: 'center' }}>User Login</h2>
                     <form className="footer-modal-form" onSubmit={handleSeekerLogin} autoComplete="off" noValidate>
-                      <input type="text" name="email" autoComplete="username" placeholder="Enter your email or phone number" value={seekerLogin.email} onChange={e => setSeekerLogin({ ...seekerLogin, email: e.target.value })} required />
-                      <input type="password" name="password" autoComplete="current-password" placeholder="Password" value={seekerLogin.password} onChange={e => setSeekerLogin({ ...seekerLogin, password: e.target.value })} required />
+                      <input type="text" name="loginId" autoComplete="username" placeholder="Enter your email or phone number" value={seekerLogin.email} onChange={e => setSeekerLogin({ ...seekerLogin, email: e.target.value })} required />
+                      <input type="password" name="loginPassword" autoComplete="current-password" placeholder="Password" value={seekerLogin.password} onChange={e => setSeekerLogin({ ...seekerLogin, password: e.target.value })} required />
                       <div className="footer-modal-row">
                         <a href="#" className="footer-modal-link" onClick={e => {
                           e.preventDefault();
@@ -1195,8 +1189,8 @@ function Footer() {
                   <div id="provider-signin-panel" style={{ display: !forgotModalOpen && signinPanel === 'provider' ? 'block' : 'none' }}>
                     <h2 className="footer-modal-heading" style={{ textAlign: 'center' }}>Employer Login</h2>
                     <form className="footer-modal-form" onSubmit={handleProviderLogin} autoComplete="off" noValidate>
-                      <input type="text" name="email" autoComplete="username" placeholder="Enter your email or phone number" value={providerLogin.email} onChange={e => setProviderLogin({ ...providerLogin, email: e.target.value })} required />
-                      <input type="password" name="password" autoComplete="current-password" placeholder="Password" value={providerLogin.password} onChange={e => setProviderLogin({ ...providerLogin, password: e.target.value })} required />
+                      <input type="text" name="loginId" autoComplete="username" placeholder="Enter your email or phone number" value={providerLogin.email} onChange={e => setProviderLogin({ ...providerLogin, email: e.target.value })} required />
+                      <input type="password" name="loginPassword" autoComplete="current-password" placeholder="Password" value={providerLogin.password} onChange={e => setProviderLogin({ ...providerLogin, password: e.target.value })} required />
                       <div className="footer-modal-row">
                         <a href="#" className="footer-modal-link" onClick={e => {
                           e.preventDefault();
