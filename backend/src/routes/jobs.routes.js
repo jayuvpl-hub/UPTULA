@@ -2,7 +2,7 @@ const express = require('express');
 const { query, getPool } = require('../db');
 const { authenticate } = require('../middleware/auth');
 const sendEmail = require('../utils/sendEmail');
-const { DEFAULT_COMPANY_LOGO, resolveCompanyLogo } = require('../config/constants');
+const { DEFAULT_COMPANY_LOGO, resolveCompanyLogo, toPublicAssetUrl } = require('../config/constants');
 // Reuse the single notification implementation
 const { sendNotification } = require('./profile.routes');
 const { makeUploader } = require('../config/Upload');
@@ -491,7 +491,7 @@ router.get('/company/:id', async (req, res, next) => {
       twitter: r.twitter || '',
       facebook: r.facebook || '',
       google: r.google || '',
-      logoUrl: r.logo_url || DEFAULT_COMPANY_LOGO,
+      logoUrl: toPublicAssetUrl(r.logo_url) || DEFAULT_COMPANY_LOGO,
       foundedYear: r.founded_year || '',
       companyType: r.company_type || '',
       isVerified: !!r.is_verified
@@ -556,7 +556,7 @@ router.get('/companies', async (req, res, next) => {
       twitter: r.twitter || '',
       facebook: r.facebook || '',
       google: r.google || '',
-      logoUrl: r.logo_url || DEFAULT_COMPANY_LOGO,
+      logoUrl: toPublicAssetUrl(r.logo_url) || DEFAULT_COMPANY_LOGO,
       foundedYear: r.founded_year || '',
       companyType: r.company_type || '',
       isVerified: !!r.is_verified

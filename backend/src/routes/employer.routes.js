@@ -4,24 +4,11 @@ const { query } = require('../db');
 const { authenticate } = require('../middleware/auth');
 const { smartNotifyForJob } = require('../utils/smartNotifier');
 const { deleteUploadedFile } = require('../config/env');
-const { resolveCompanyLogo } = require('../config/constants');
+const { resolveCompanyLogo, toPublicAssetUrl } = require('../config/constants');
 const { applyUserContactUpdate } = require('../utils/email');
 const { makeUploader, filters } = require('../config/Upload');
 
 const router = express.Router();
-
-const ASSET_BASE_URL = (
-  process.env.ASSET_BASE_URL || 'https://uptula-app-storage.s3.ap-south-1.amazonaws.com'
-).replace(/\/$/, '');
-
-/** Full public URL for a stored S3 key. Passes through http(s) URLs; empty for falsy values. */
-function publicAssetUrl(value) {
-  if (!value) return '';
-  const raw = String(value).trim();
-  if (!raw) return '';
-  if (/^https?:\/\//i.test(raw)) return raw;
-  return `${ASSET_BASE_URL}/${raw.replace(/^\/+/, '')}`;
-}
 
 const ANALYTICS_FEATURE_KEY = 'job_analytics_dashboard';
 const ANALYTICS_TRIAL_LIMIT = 3;
@@ -204,7 +191,7 @@ router.get('/profile', authenticate, async (req, res, next) => {
       twitter: profile.twitter || '',
       facebook: profile.facebook || '',
       google: profile.google || '',
-      logoUrl: publicAssetUrl(profile.logo_url),
+      logoUrl: toPublicAssetUrl(profile.logo_url),
       foundedYear: profile.founded_year || '',
       companyType: profile.company_type || '',
       isVerified: profile.is_verified || false,
@@ -366,7 +353,7 @@ async function updateEmployerProfile(req, res, next) {
       }
     }
 
-    res.json({ message: 'Employer profile updated successfully', logoUrl: publicAssetUrl(logoUrl) });
+    res.json({ message: 'Employer profile updated successfully', logoUrl: toPublicAssetUrl(logoUrl) });
   } catch (err) {
     if (err && err.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({ message: 'Email already registered' });

@@ -6,7 +6,7 @@ const { makeUploader, filters } = require('../config/Upload');
 const { smartNotifyForJob } = require('../utils/smartNotifier');
 const { auditFromReq } = require('../utils/audit');
 const { getUserCategories } = require('../utils/userCategories');
-const { resolveCompanyLogo } = require('../config/constants');
+const { resolveCompanyLogo, toPublicAssetUrl } = require('../config/constants');
 const { findEmailConflict } = require('../utils/email');
 
 const router = express.Router();
@@ -360,7 +360,10 @@ router.get('/employers/:id/profile', authenticate, authenticateAdmin, async (req
       return res.status(404).json({ message: 'Employer not found' });
     }
     const profileRows = await query('SELECT * FROM employer_profiles WHERE user_id = ?', [id]);
-    const profile = profileRows.length > 0 ? profileRows[0] : null;
+    const row = profileRows.length > 0 ? profileRows[0] : null;
+    const profile = row
+      ? { ...row, logoUrl: toPublicAssetUrl(row.logo_url) }
+      : null;
     return res.json({ employer: users[0], profile });
   } catch (err) {
     return next(err);
