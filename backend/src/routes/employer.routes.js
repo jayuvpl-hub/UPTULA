@@ -10,6 +10,19 @@ const { makeUploader, filters } = require('../config/Upload');
 
 const router = express.Router();
 
+const ASSET_BASE_URL = (
+  process.env.ASSET_BASE_URL || 'https://uptula-app-storage.s3.ap-south-1.amazonaws.com'
+).replace(/\/$/, '');
+
+/** Full public URL for a stored S3 key. Passes through http(s) URLs; empty for falsy values. */
+function publicAssetUrl(value) {
+  if (!value) return '';
+  const raw = String(value).trim();
+  if (!raw) return '';
+  if (/^https?:\/\//i.test(raw)) return raw;
+  return `${ASSET_BASE_URL}/${raw.replace(/^\/+/, '')}`;
+}
+
 const ANALYTICS_FEATURE_KEY = 'job_analytics_dashboard';
 const ANALYTICS_TRIAL_LIMIT = 3;
 const BILLING_PAUSED = true;
@@ -191,7 +204,7 @@ router.get('/profile', authenticate, async (req, res, next) => {
       twitter: profile.twitter || '',
       facebook: profile.facebook || '',
       google: profile.google || '',
-      logoUrl: profile.logo_url || '',
+      logoUrl: publicAssetUrl(profile.logo_url),
       foundedYear: profile.founded_year || '',
       companyType: profile.company_type || '',
       isVerified: profile.is_verified || false,
@@ -266,7 +279,7 @@ async function updateEmployerProfile(req, res, next) {
     const hasProfile = profileInfo.length > 0;
     const existingProfile = hasProfile ? profileInfo[0] : null;
     const previousLogoPath = existingProfile?.logo_url || null;
-    let logoUrl = req.body.logoUrl || previousLogoPath || null;
+    let logoUrl = previousLogoPath || null;
 
     if (req.file) {
       logoUrl = req.file.key;
@@ -353,7 +366,7 @@ async function updateEmployerProfile(req, res, next) {
       }
     }
 
-    res.json({ message: 'Employer profile updated successfully', logoUrl });
+    res.json({ message: 'Employer profile updated successfully', logoUrl: publicAssetUrl(logoUrl) });
   } catch (err) {
     if (err && err.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({ message: 'Email already registered' });

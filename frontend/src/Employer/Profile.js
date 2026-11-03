@@ -277,6 +277,7 @@ function Profile() {
             };
             const sanitizePayload = () => {
                 return Object.entries(payloadRaw).reduce((acc, [key, value]) => {
+                    if (key === 'logoUrl') return acc;
                     if (value === null || value === undefined) return acc;
                     if (typeof value === 'string') {
                         const trimmed = value.trim();
