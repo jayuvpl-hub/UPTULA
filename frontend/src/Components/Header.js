@@ -1136,10 +1136,7 @@ function Header() {
         e.stopPropagation();
         setEmployerMenuOpen(false);
         setMobileNavOpen(false);
-        window.dispatchEvent(new Event('uptula:open-employer-register'));
-        if (typeof window !== 'undefined' && window.jQuery) {
-            window.jQuery('#register').modal('show');
-        }
+        navigate('/employer/register');
     };
 
     const handleLogout = (e) => {
@@ -1281,9 +1278,9 @@ function Header() {
                 .header-employer-menu {
                     position: absolute;
                     top: calc(100% + 6px);
-                    left: 50%;
-                    right: auto;
-                    transform: translateX(-50%);
+                    left: auto;
+                    right: 0;
+                    transform: none;
                     min-width: 168px;
                     margin: 0;
                     padding: 6px;
@@ -1372,14 +1369,7 @@ function Header() {
                         min-width: 0;
                         max-width: 9.5em;
                     }
-                    nav.navbar.bootsnav #navbar-menu .navbar-left > li.header-employer-dropdown {
-                        max-width: none;
-                        overflow: visible;
-                        position: relative;
-                    }
-                    nav.navbar.bootsnav #navbar-menu .navbar-left > li > a,
-                    nav.navbar.bootsnav #navbar-menu .navbar-left .header-employer-trigger,
-                    nav.navbar.bootsnav #navbar-menu .navbar-left .header-employer-label {
+                    nav.navbar.bootsnav #navbar-menu .navbar-left > li > a {
                         display: block;
                         max-width: 100%;
                         overflow: hidden;
@@ -1391,13 +1381,16 @@ function Header() {
                         overflow: visible;
                         z-index: 1300;
                     }
-                    nav.navbar.bootsnav #navbar-menu .navbar-left .header-employer-trigger {
+                    nav.navbar.bootsnav #navbar-menu .navbar-right .header-employer-dropdown {
+                        max-width: none;
+                        overflow: visible;
+                        position: relative;
+                        margin-left: 4px;
+                    }
+                    nav.navbar.bootsnav #navbar-menu .navbar-right .header-employer-trigger {
                         display: inline-flex;
                         align-items: center;
-                        max-width: 100%;
-                    }
-                    nav.navbar.bootsnav #navbar-menu .navbar-left .header-employer-label {
-                        min-width: 0;
+                        max-width: none;
                     }
                     nav.navbar.bootsnav #navbar-menu .navbar-right {
                         margin: 0 !important;
@@ -2169,38 +2162,6 @@ function Header() {
                                 {" "}
                                 <Link to="/Services" onClick={() => setMobileNavOpen(false)}>Services</Link>{" "}
                             </li>
-                            {!loading && !user && (
-                                <li className={`header-employer-dropdown dropdown${employerMenuOpen ? ' is-open' : ''}`}>
-                                    <button
-                                        type="button"
-                                        className="header-employer-trigger"
-                                        aria-expanded={employerMenuOpen}
-                                        aria-haspopup="true"
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            setEmployerMenuOpen((v) => !v);
-                                        }}
-                                    >
-                                        <span className="header-employer-label" title="For employer">For employer</span>
-                                        <i className="ti-angle-down header-employer-chevron" aria-hidden="true" />
-                                    </button>
-                                    {employerMenuOpen && (
-                                        <ul className="header-employer-menu" role="menu">
-                                            <li role="none">
-                                                <button type="button" role="menuitem" onClick={openEmployerSigninModal}>
-                                                    Login
-                                                </button>
-                                            </li>
-                                            <li role="none">
-                                                <button type="button" role="menuitem" onClick={openEmployerRegisterModal}>
-                                                    Register
-                                                </button>
-                                            </li>
-                                        </ul>
-                                    )}
-                                </li>
-                            )}
                             {user && user.role !== 'provider' && user.role !== 'employer' && user.role !== 'admin' && (
                                 <>
                                     <li className="mobile-candidate-only">
@@ -2394,20 +2355,14 @@ function Header() {
                                             </a>
                                         </li>
                                         <li className="sign-up" style={{ display: 'flex', alignItems: 'center' }}>
-                                            <a
-                                                href="#"
+                                            <Link
+                                                to="/register"
                                                 className="btn-signup red-btn"
-                                                data-toggle="modal"
-                                                data-target="#register"
-                                                onClick={(e) => {
-                                                    e.preventDefault();
-                                                    setMobileNavOpen(false);
-                                                    window.dispatchEvent(new Event('uptula:open-default-register'));
-                                                }}
+                                                onClick={() => setMobileNavOpen(false)}
                                             >
                                                 <span className="ti-briefcase" />
                                                 <span className="header-btn-label">Register</span>
-                                            </a>
+                                            </Link>
                                         </li>
                                     </>
                                 )}
@@ -2427,6 +2382,38 @@ function Header() {
                                 >
                                     <LanguageSelector />
                                 </li>
+                                {!loading && !user && (
+                                    <li className={`header-employer-dropdown dropdown${employerMenuOpen ? ' is-open' : ''}`}>
+                                        <button
+                                            type="button"
+                                            className="header-employer-trigger"
+                                            aria-expanded={employerMenuOpen}
+                                            aria-haspopup="true"
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                setEmployerMenuOpen((v) => !v);
+                                            }}
+                                        >
+                                            <span className="header-employer-label" title="For employer">For employer</span>
+                                            <i className="ti-angle-down header-employer-chevron" aria-hidden="true" />
+                                        </button>
+                                        {employerMenuOpen && (
+                                            <ul className="header-employer-menu" role="menu">
+                                                <li role="none">
+                                                    <button type="button" role="menuitem" onClick={openEmployerSigninModal}>
+                                                        Login
+                                                    </button>
+                                                </li>
+                                                <li role="none">
+                                                    <button type="button" role="menuitem" onClick={openEmployerRegisterModal}>
+                                                        Register
+                                                    </button>
+                                                </li>
+                                            </ul>
+                                        )}
+                                    </li>
+                                )}
                             </ul>
                         </div>
                     </div>

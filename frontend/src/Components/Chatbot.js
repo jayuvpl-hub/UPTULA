@@ -142,11 +142,7 @@ const Chatbot = () => {
       return;
     }
     if (action === "register-candidate" || action === "register-employer") {
-      // Trigger register modal or navigate
-      const registerBtn = document.querySelector('[data-target="#register"]');
-      if (registerBtn) {
-        registerBtn.click();
-      }
+      navigate(action === "register-employer" ? "/employer/register" : "/register");
       setIsOpen(false);
       return;
     }

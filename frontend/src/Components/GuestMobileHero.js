@@ -101,10 +101,7 @@ function GuestMobileHero({
   const openRegisterModal = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    window.dispatchEvent(new Event('uptula:open-default-register'));
-    if (typeof window !== 'undefined' && window.jQuery) {
-      window.jQuery('#register').modal('show');
-    }
+    navigate('/register');
   };
 
   return (

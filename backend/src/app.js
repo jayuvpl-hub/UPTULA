@@ -39,52 +39,58 @@ app.use(
       directives: {
         "script-src": [
           "'self'",
-          "https://apis.google.com",
-          "https://www.googletagmanager.com",
-          "https://translate.google.com",
-          "https://translate.googleapis.com",
-          "https://www.gstatic.com",
-          "https://checkout.razorpay.com",
-          // the 5 inline scripts reported in your console (hashes come from the errors)
+          "https://apis.google.com", // Google Sign-In / GIS
+          "https://www.googletagmanager.com", // GTM / GA4 bootstrap
+          "https://translate.google.com", // Google Translate
+          "https://translate.googleapis.com", // Google Translate
+          "https://www.gstatic.com", // Google static assets
+          "https://checkout.razorpay.com", // Razorpay checkout
+          // inline scripts reported in console (hashes from CSP errors)
           "'sha256-TNSm+/DEXh9w/Fo33Wz84A65g+Y3Px9oixyZj1/Ec/Y='",
           "'sha256-mkZV8gJBe6MHB7zo2GK5fxiDyLMWG9GHdUXVXq42Q18='",
           "'sha256-5y+4YquVY7gYnT64S3D3msmVlZ86kOmsULfJ9p7UH+E='",
           "'sha256-2oLUq7BDBiuK7Zcmkxn5uwM5PDYsQmg6e0zXf4/og8I='",
           "'sha256-1bOzKaAmWYJurDW82qpT3993yU2pFTjK2a/Vb0WN3hc='",
+          "'sha256-R6kjt5FwTd5vAw94Q08NLDZsSaGTzg4NsdIfKtECSp0='", // about:srcdoc iframe inline script
         ],
         "frame-src": [
           "'self'",
-          "https://accounts.google.com",
-          "https://uptula-d1894.firebaseapp.com",
-          "https://translate.google.com",
-          "https://api.razorpay.com",
-          "https://checkout.razorpay.com",
+          "https://accounts.google.com", // Google Sign-In
+          "https://uptula-d1894.firebaseapp.com", // Firebase Auth
+          "https://translate.google.com", // Google Translate
+          "https://api.razorpay.com", // Razorpay
+          "https://checkout.razorpay.com", // Razorpay checkout
         ],
         "connect-src": [
           "'self'",
-          "https://identitytoolkit.googleapis.com",
-          "https://securetoken.googleapis.com",
-          "https://www.googleapis.com",
-          "https://apis.google.com",
-          "https://translate.googleapis.com",
-          "https://www.googletagmanager.com",
-          "https://www.google-analytics.com",
-          "https://*.google-analytics.com",
-          "https://*.analytics.google.com",
-          "https://api.razorpay.com",
-          "https://lumberjack.razorpay.com",
+          "https://identitytoolkit.googleapis.com", // Firebase Auth
+          "https://securetoken.googleapis.com", // Firebase Auth
+          "https://www.googleapis.com", // Google APIs
+          "https://apis.google.com", // Google Sign-In
+          "https://translate.googleapis.com", // Google Translate
+          "https://www.googletagmanager.com", // GTM
+          "https://www.google-analytics.com", // GA4
+          "https://*.google-analytics.com", // GA4 region endpoints
+          "https://*.analytics.google.com", // GA4 analytics subdomains
+          "https://analytics.google.com", // GA4 bare host (wildcard does not match)
+          "https://www.google.com", // GA4 /g/collect
+          "https://api.razorpay.com", // Razorpay API
+          "https://lumberjack.razorpay.com", // Razorpay telemetry
         ],
         "img-src": [
           "'self'",
           "data:",
           "blob:",
-          "https://uptula-app-storage.s3.ap-south-1.amazonaws.com",
-          "https://*.googleusercontent.com",
-          "https://www.gstatic.com",
-          "https://www.google.com",
-          "https://www.google-analytics.com",
-          "https://www.googletagmanager.com",
-          "https://translate.googleapis.com",
+          "https://uptula-app-storage.s3.ap-south-1.amazonaws.com", // S3 company logos / uploads
+          "https://*.googleusercontent.com", // Google profile photos
+          "https://www.gstatic.com", // Google static assets
+          "https://www.google.com", // Google pixels
+          "https://www.google-analytics.com", // GA4
+          "https://analytics.google.com", // GA4 bare host
+          "https://*.google-analytics.com", // GA4 region pixels
+          "https://www.googletagmanager.com", // GTM
+          "https://*.googletagmanager.com", // GTM subdomains
+          "https://translate.googleapis.com", // Google Translate
         ],
       },
     },

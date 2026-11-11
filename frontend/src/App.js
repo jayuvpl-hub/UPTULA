@@ -25,7 +25,7 @@ import Referral from "./Employer/Referral";
 import CandidateChat from "./Candidate/Chat";
 import EmployerChat from "./Employer/Chat";
 import Wishlist from "./Candidate/Wishlist";
-import Register from "./Pages/Register";
+import RequireAuth from "./Components/auth/RequireAuth";
 import WFH from "./Inner Pages/WFH";
 import Internship from "./Inner Pages/Internship";
 import Freelancing from "./Inner Pages/Freelancing";
@@ -47,7 +47,11 @@ import Faq from "./Pages/Faq";
 import Grievances from "./Pages/Grievances";
 import FraudAlert from "./Pages/FraudAlert";
 import Sitemap from "./Pages/Sitemap";
-import RegisterPage from "./Components/RegisterPage";
+import RegisterPage from "./Pages/auth/RegisterPage";
+import LoginPage from "./Pages/auth/LoginPage";
+import EmployerLoginPage from "./Pages/auth/EmployerLoginPage";
+import EmployerRegisterPage from "./Pages/auth/EmployerRegisterPage";
+import ForgotPasswordPage from "./Pages/auth/ForgotPasswordPage";
 import RedirectPage from "./Pages/RedirectPage";
 function AppContent() {
   const { loading } = useAuth();
@@ -109,31 +113,35 @@ function AppContent() {
         <Route path="/jobs/:slug" element={<JobDetail />} />
         <Route path="/company/:id" element={<CompanyDetails />} />
         <Route path="/internal/create-user" element={<InternalCreateUser />} />
-        <Route path="/candidate/applied-jobs" element={<AppliedJobs />} />
-        <Route path="/candidate/create-resume" element={<CreateResume />} />
-        <Route path="/candidate/profile-tools" element={<ProfileTools />} />
-        <Route path="/candidate/change-password" element={<ChangePassword />} />
-        <Route path="/candidate/chat" element={<CandidateChat />} />
-        <Route path="/candidate/wishlist" element={<Wishlist />} />
-        <Route path="/employer/view-candidates" element={<ViewCandidates />} />
-        <Route path="/employer/boolean-search" element={<BooleanSearch />} />
-        <Route path="/employer/resume-scoring" element={<ResumeScoring />} />
-        <Route path="/employer/referral" element={<Referral />} />
-        <Route path="/employer/support" element={<EmployerSupport />} />
+        <Route path="/candidate/applied-jobs" element={<RequireAuth role="seeker"><AppliedJobs /></RequireAuth>} />
+        <Route path="/candidate/create-resume" element={<RequireAuth role="seeker"><CreateResume /></RequireAuth>} />
+        <Route path="/candidate/profile-tools" element={<RequireAuth role="seeker"><ProfileTools /></RequireAuth>} />
+        <Route path="/candidate/change-password" element={<RequireAuth role="seeker"><ChangePassword /></RequireAuth>} />
+        <Route path="/candidate/chat" element={<RequireAuth role="seeker"><CandidateChat /></RequireAuth>} />
+        <Route path="/candidate/wishlist" element={<RequireAuth role="seeker"><Wishlist /></RequireAuth>} />
+        <Route path="/employer/view-candidates" element={<RequireAuth role="provider"><ViewCandidates /></RequireAuth>} />
+        <Route path="/employer/boolean-search" element={<RequireAuth role="provider"><BooleanSearch /></RequireAuth>} />
+        <Route path="/employer/resume-scoring" element={<RequireAuth role="provider"><ResumeScoring /></RequireAuth>} />
+        <Route path="/employer/referral" element={<RequireAuth role="provider"><Referral /></RequireAuth>} />
+        <Route path="/employer/support" element={<RequireAuth role="provider"><EmployerSupport /></RequireAuth>} />
         <Route path="/Services" element={<Services />} />
         <Route path="/services" element={<Services />} />
         <Route path="/terms-conditions" element={<TermsConditions />} />
         <Route path="/report-issue" element={<ReportIssue />} />
         <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-        <Route path="/register" element={<RegisterPage  />} />
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/employer/profile" element={<EmployerProfile />} />
-        <Route path="/employer/add-jobs" element={<AddJobs />} />
-        <Route path="/employer/manage-jobs" element={<ManageJobs />} />
-        <Route path="/employer/premium" element={<EmployerPremiumManager />} />
-        <Route path="/employer/chat" element={<EmployerChat />} />
-        <Route path="/employer/analytics" element={<EmployerAnalytics />} />
-        <Route path="/employer/change-password" element={<EmployerChangePassword />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/employer/login" element={<EmployerLoginPage />} />
+        <Route path="/employer/register" element={<EmployerRegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/profile" element={<RequireAuth role="seeker"><Profile /></RequireAuth>} />
+        <Route path="/employer/profile" element={<RequireAuth role="provider"><EmployerProfile /></RequireAuth>} />
+        <Route path="/employer/add-jobs" element={<RequireAuth role="provider"><AddJobs /></RequireAuth>} />
+        <Route path="/employer/manage-jobs" element={<RequireAuth role="provider"><ManageJobs /></RequireAuth>} />
+        <Route path="/employer/premium" element={<RequireAuth role="provider"><EmployerPremiumManager /></RequireAuth>} />
+        <Route path="/employer/chat" element={<RequireAuth role="provider"><EmployerChat /></RequireAuth>} />
+        <Route path="/employer/analytics" element={<RequireAuth role="provider"><EmployerAnalytics /></RequireAuth>} />
+        <Route path="/employer/change-password" element={<RequireAuth role="provider"><EmployerChangePassword /></RequireAuth>} />
         <Route path="/help-center" element={<HelpCenter />} />
         <Route path="/Work-From-Home-job" element={<WFH />} />
         <Route path="/Internship" element={<Internship />} />
