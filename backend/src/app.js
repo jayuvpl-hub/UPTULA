@@ -45,6 +45,8 @@ app.use(
           "https://translate.googleapis.com", // Google Translate
           "https://www.gstatic.com", // Google static assets
           "https://checkout.razorpay.com", // Razorpay checkout
+          "https://translate-pa.googleapis.com", // Google Translate widget language list
+          "https://connect.facebook.net", // Meta Pixel fbevents.js
           // inline scripts reported in console (hashes from CSP errors)
           "'sha256-TNSm+/DEXh9w/Fo33Wz84A65g+Y3Px9oixyZj1/Ec/Y='",
           "'sha256-mkZV8gJBe6MHB7zo2GK5fxiDyLMWG9GHdUXVXq42Q18='",
@@ -68,12 +70,15 @@ app.use(
           "https://www.googleapis.com", // Google APIs
           "https://apis.google.com", // Google Sign-In
           "https://translate.googleapis.com", // Google Translate
+          "https://translate-pa.googleapis.com", // Google Translate widget requests
           "https://www.googletagmanager.com", // GTM
           "https://www.google-analytics.com", // GA4
           "https://*.google-analytics.com", // GA4 region endpoints
           "https://*.analytics.google.com", // GA4 analytics subdomains
           "https://analytics.google.com", // GA4 bare host (wildcard does not match)
           "https://www.google.com", // GA4 /g/collect
+          "https://www.facebook.com", // Meta Pixel events
+          "https://connect.facebook.net", // Meta Pixel
           "https://api.razorpay.com", // Razorpay API
           "https://lumberjack.razorpay.com", // Razorpay telemetry
         ],
@@ -84,6 +89,7 @@ app.use(
           "https://uptula-app-storage.s3.ap-south-1.amazonaws.com", // S3 company logos / uploads
           "https://*.googleusercontent.com", // Google profile photos
           "https://www.gstatic.com", // Google static assets
+          "https://fonts.gstatic.com", // Google Translate widget icon
           "https://www.google.com", // Google pixels
           "https://www.google-analytics.com", // GA4
           "https://analytics.google.com", // GA4 bare host
@@ -91,6 +97,9 @@ app.use(
           "https://www.googletagmanager.com", // GTM
           "https://*.googletagmanager.com", // GTM subdomains
           "https://translate.googleapis.com", // Google Translate
+          "https://play.google.com", // Play Store badge
+          "https://developer.apple.com", // App Store badge
+          "https://www.facebook.com", // Meta Pixel tracking beacon / noscript fallback
         ],
       },
     },
