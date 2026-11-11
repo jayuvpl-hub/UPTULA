@@ -79,6 +79,8 @@ app.use(
           "https://www.google.com", // GA4 /g/collect
           "https://www.facebook.com", // Meta Pixel events
           "https://connect.facebook.net", // Meta Pixel
+          "https://yf-b498ef1790e74b69af7f2475cece9e0e.ecs.us-west-2.on.aws", // Meta Conversions API Gateway / Open Bridge endpoint
+          "https://snofje0za8n8.cloud.run", // Meta Conversions API Gateway / Open Bridge endpoint
           "https://api.razorpay.com", // Razorpay API
           "https://lumberjack.razorpay.com", // Razorpay telemetry
         ],
