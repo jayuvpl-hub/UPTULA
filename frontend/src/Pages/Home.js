@@ -2423,8 +2423,8 @@ function Home() {
                         <WishlistButton jobId={job.id} style={{ marginLeft: 'auto' }} />
                     </div>
 
-                    <h3 className="job-title">
-                        <Link to={jobUrl} onClick={(e) => e.stopPropagation()}>
+                    <h3 className="job-title" title={prettifyText(job.title)}>
+                        <Link to={jobUrl} onClick={(e) => e.stopPropagation()} title={prettifyText(job.title)}>
                             {prettifyText(job.title)}
                         </Link>
                     </h3>
@@ -2555,10 +2555,18 @@ function Home() {
                 line-height:1.3;
                 color:#212529;
                 margin:0;
+                min-width:0;
+                overflow:hidden;
+                text-overflow:ellipsis;
+                white-space:nowrap;
             }
             .job-title a{
                 color:inherit;
                 text-decoration:none;
+                display:block;
+                overflow:hidden;
+                text-overflow:ellipsis;
+                white-space:nowrap;
             }
             .job-title a:hover{
                 color:#0d6efd;
