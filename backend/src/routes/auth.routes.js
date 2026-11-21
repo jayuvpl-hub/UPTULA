@@ -16,6 +16,7 @@ const { getOrCreateActiveOtp, dispatchOtp, verifyOtp, otpHttpStatus } = require(
 const { validateCategoryPair, validateCategoryList } = require('../utils/categoryValidation');
 const { setUserCategories } = require('../utils/userCategories');
 const { hashPassword, verifyPassword, needsRehash } = require('../utils/password');
+const { createUser } = require('../services/createUser');
 const router = express.Router();
 
 // Parse a JSON column / string into an array of positive integers.
@@ -630,22 +631,16 @@ router.post('/verify-register-otp', async (req, res) => {
       });
     }
 
-    const result = await query(
-      `INSERT INTO users (role, full_name, email, phone, password_hash, category_id, subcategory_id, experience)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        record.role,
-        record.full_name,
-        storedEmail,
-        record.phone,
-        record.password_hash,
-        record.category_id || record.registration_category_id || null,
-        record.subcategory_id || record.registration_subcategory_id || null,
-        record.experience || null,
-      ]
-    );
-
-    const newUserId = result.insertId;
+    const { userId: newUserId } = await createUser({
+      role: record.role,
+      fullName: record.full_name,
+      email: storedEmail,
+      phone: record.phone,
+      passwordHash: record.password_hash,
+      categoryId: record.category_id || record.registration_category_id || null,
+      subcategoryId: record.subcategory_id || record.registration_subcategory_id || null,
+      experience: record.experience || null,
+    });
 
     // Populate multi-category junction tables (falls back to the single pair).
     try {

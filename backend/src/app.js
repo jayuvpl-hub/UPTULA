@@ -25,6 +25,7 @@ const aiRoutes = require('./routes/ai.routes');
 const appRoutes = require('./routes/app.routes');
 const paymentRoutes = require('./routes/payment.routes')
 const webhookRoutes = require('./routes/webhook.routes');
+const internalRoutes = require('./routes/internal.routes');
 const path = require('path');
 const fs = require('fs');
 
@@ -126,6 +127,9 @@ app.use(
     credentials: true,
   })
 );
+
+// CRM/agent S2S routes: own limiter; mounted before the global /api rateLimiter.
+app.use('/api/internal', internalRoutes);
 
 app.use('/api', rateLimiter);
 app.use('/api/auth', authRoutes);
