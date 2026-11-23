@@ -6,7 +6,7 @@ const { isProduction } = require('../config/env');
 
 // must match the DLT-approved template ID
 const AGENT_WELCOME_SMS_TEXT =
-  'An Uptula agent registered you on uptula.com. If you did not expect this, reset your password using Forgot Password.';
+  'Welcome to Uptula,  An Uptula agent created your account. Did not expect this? Secure it now using Forgot Password.';
 
 async function sendAgentWelcomeSms(phone) {
   const templateId = process.env.DROPHELLO_AGENT_WELCOME_TEMPLATE_ID;
